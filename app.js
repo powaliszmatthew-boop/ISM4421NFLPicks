@@ -59,6 +59,19 @@ function reasons(bet) {
   return out;
 }
 
+// A recommended pick as a row for My bets, with what's needed to settle it automatically.
+function trackedBet(b, stake) {
+  const g = b.pred.game;
+  let line = null;
+  if (b.market === "ATS") line = b.side === "home" ? -g.spread : g.spread;
+  if (b.market === "TOT") line = g.totalLine;
+  return {
+    kind: "game", description: `${b.label} (${g.away} @ ${g.home})`, odds: b.american,
+    stake: Math.round(stake * 100) / 100, model_prob: Number(b.prob.toFixed(5)), edge: Number(b.ev.toFixed(5)),
+    market: b.market, game_id: g.id, side: b.side, line, season: g.season, week: g.week,
+  };
+}
+
 function renderPicks() {
   const s = settings();
   const upcoming = state.upcoming;
@@ -94,7 +107,9 @@ function renderPicks() {
         <div><dt>Suggested stake</dt><dd>$${stake.toFixed(2)}</dd></div>
       </dl>
       <ul class="why">${reasons(b).map(r => `<li>${r}</li>`).join("")}</ul>
-      ${publicLine(b)}`;
+      ${publicLine(b)}
+      <button type="button" class="track-btn">Track bet</button>`;
+    card.querySelector(".track-btn").addEventListener("click", e => window.GridIronTrack.trackButton(e.target, trackedBet(b, stake)));
     box.appendChild(card);
   }
 }

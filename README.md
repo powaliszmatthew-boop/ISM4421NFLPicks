@@ -11,9 +11,21 @@ A static web app that recommends NFL bets (spread, over/under, and optionally mo
 - **Live betting splits:** a Netlify function (`netlify/functions/splits.mjs`) reads the [DraftKings Sportsbook betting splits](https://dknetwork.draftkings.com/draftkings-sportsbook-betting-splits/) page. For each upcoming game it returns the % of money (handle) and % of bets on each side of the moneyline, spread, and total. The app refreshes it every 5 minutes and flags "sharp" sides (money % ≥ 15 points above bets %) and "public" sides (≥ 70% of bets). Sportsbooks only publish percentages, not dollar totals.
 - **Track record:** every past pick was made without seeing that week's results, so the season-by-season record is an honest out-of-sample backtest.
 
+## Pages
+
+- **Game picks** (`index.html`): the game model's spread, total, and moneyline picks. Each pick has a **Track bet** button.
+- **Player props** (`props.html`): projections for every active QB, RB, WR, and TE. A calculator prices any line you get from a sportsbook (win chance, fair odds, edge, quarter-Kelly stake). Saved props are re-priced on every load and ranked as suggestions, and past props are graded against what the model said before kickoff.
+- **My bets** (`bets.html`): every bet you track or add by hand, with record, profit, ROI, and a running-profit chart. Bets tracked from the picks pages settle automatically from final scores and stat lines.
+
+## Player props model
+
+`props-model.js` walks through every week of nflverse weekly player stats in order, like the game model. A projection is a recency-weighted average (last season counts half), nudged for the opponent's defense against that position and the team's implied points. Week by week it learns three corrections for each stat and volume tier: projection bias, spread of outcomes, and a calibration curve for where results land. The projection becomes a gamma, normal, or count distribution, which gives over, under, and push chances for any line.
+
+Walk-forward backtest (2025 to tune, 2026 Weeks 1–6 unseen): projections were about 2–4% more accurate than a player's last-8-game average. Predicted over rates at a line matched actual rates within about 3 points. The Netlify function `netlify/functions/player-stats.mjs` serves this season's and last season's stats (GitHub release files can't be fetched from the browser).
+
 ## Accounts
 
-Sign-in uses email and password through Supabase Auth (project `ISM4421NFLPicks`). The app stays hidden until someone signs in. Each user's edge, markets, and bankroll are saved to the `user_settings` table, and row-level security limits every user to their own row. The project URL and publishable key are in `config.js`. The table definition is in `supabase/migrations/`.
+Sign-in uses email and password through Supabase Auth (project `ISM4421NFLPicks`). The app stays hidden until someone signs in. Each user's settings (`user_settings`), bets (`bets`), and saved props (`props`) are stored in Supabase, and row-level security limits every user to their own rows. The project URL and publishable key are in `config.js`. The table definition is in `supabase/migrations/`.
 
 In the Supabase dashboard under **Authentication → URL Configuration**, **Site URL** and **Redirect URLs** must include `https://gridironedgenfl.netlify.app`, or confirmation and password-reset links won't come back to the app.
 

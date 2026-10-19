@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Player Props · GridIron Edge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>GridIron Edge</h1>
+    <p class="tagline">Player props priced from week-to-week player stats</p>
+    <nav class="site-nav" aria-label="Pages">
+      <a href="index.html">Game picks</a>
+      <a href="props.html" aria-current="page">Player props</a>
+      <a href="bets.html">My bets</a>
+    </nav>
+    <nav class="nav" aria-label="On this page">
+      <a href="#mine-h">My props &amp; suggestions</a>
+      <a href="#calc-h">Price a prop</a>
+      <a href="#proj-h">This week's projections</a>
+      <a href="#past-h">Past props</a>
+      <a href="#how-h" class="key-link">How it works</a>
+    </nav>
+  </header>
+
+  <main class="wrap" hidden>
+    <p id="status" class="status" role="status">Loading player stats and this week's games…</p>
+
+    <section class="controls" aria-label="Prop settings">
+      <label>
+        <span>Minimum edge (expected value): <strong id="edge-out">3%</strong></span>
+        <input id="edge" type="range" min="0" max="12" step="1" value="3">
+      </label>
+      <label>
+        <span>Bankroll ($)</span>
+        <input id="bankroll" type="number" min="0" step="50" value="500">
+      </label>
+      <p class="explain wide">Same settings as the game picks page. A prop is suggested when the model's edge on one side is at least the minimum. Stakes use quarter-Kelly, capped at 3% of bankroll.</p>
+      <p id="save-state" class="muted small save-state" role="status"></p>
+    </section>
+
+    <section class="card" aria-labelledby="mine-h">
+      <h2 id="mine-h">My props &amp; suggestions</h2>
+      <p class="explain">Props you've saved for this week, re-priced with the latest model every time the page loads. Copy a line and its odds from your sportsbook into <a href="#calc-h">Price a prop</a> and save it. The model has no feed of sportsbook prop lines, so it needs yours to find an edge. Props that clear your minimum edge come first.</p>
+      <p id="mine-sub" class="muted"></p>
+      <div id="mine" class="picks"></div>
+    </section>
+
+    <section class="card" aria-labelledby="calc-h">
+      <h2 id="calc-h">Price a prop</h2>
+      <p class="explain">Pick a player and stat, then enter the line and odds from your sportsbook. The line starts at the model's fair line, its 50/50 point.</p>
+      <form id="calc" class="calc">
+        <label><span>Game</span><select id="c-game"></select></label>
+        <label><span>Player</span><select id="c-player"></select></label>
+        <label><span>Prop</span><select id="c-stat"></select></label>
+        <label><span>Line</span><input id="c-line" type="number" step="0.5" min="0" required></label>
+        <label><span>Over odds</span><input id="c-over" type="number" step="1" value="-110" required></label>
+        <label><span>Under odds</span><input id="c-under" type="number" step="1" value="-110" required></label>
+        <label><span>Sportsbook (optional)</span><input id="c-book" type="text" maxlength="40" placeholder="e.g. DraftKings"></label>
+      </form>
+      <div id="calc-out" class="calc-out" aria-live="polite"></div>
+    </section>
+
+    <section class="card" aria-labelledby="proj-h">
+      <div class="row-head">
+        <h2 id="proj-h">This week's projections</h2>
+        <div class="filters">
+          <label class="inline">Prop <select id="p-stat"></select></label>
+          <label class="inline">Position <select id="p-pos"><option value="">All</option><option>QB</option><option>RB</option><option>WR</option><option>TE</option></select></label>
+          <label class="inline">Search <input id="p-search" type="search" placeholder="Player or team"></label>
+        </div>
+      </div>
+      <p class="explain">The model's average and fair line for every active player. When your sportsbook's line is well away from the fair line, price it to see the edge.</p>
+      <div class="scroll"><table id="proj" class="table"></table></div>
+      <button id="p-more" type="button" class="link" hidden>Show all</button>
+    </section>
+
+    <section class="card" aria-labelledby="past-h">
+      <h2 id="past-h">Past props</h2>
+      <p class="explain">Props you saved for earlier weeks, with the result and whether the model's side won.</p>
+      <div id="past-sum" class="tiles"></div>
+      <div class="scroll"><table id="past" class="table"></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="how-h">
+      <h2 id="how-h">How it works</h2>
+      <ol class="how">
+        <li><strong>Data.</strong> Every QB, RB, WR, and TE game from last season and this one, from the open <a href="https://github.com/nflverse/nflverse-data" target="_blank" rel="noopener">nflverse</a> weekly player stats. It's downloaded fresh, so new weeks show up automatically.</li>
+        <li><strong>Projection.</strong> For each player and stat, a weighted average of their games (recent games count most, last season counts half), pulled slightly toward the position average. It's nudged for the opponent's defense against that position and for the team's implied points from the betting line.</li>
+        <li><strong>Learning week to week.</strong> The model walks through every week in order. It projects that week, sees the results, and learns. It corrects projections that run high or low for each kind of player, how spread out results are, and how often results land above or below each line. Each new week of games updates all three.</li>
+        <li><strong>Probability.</strong> The projection becomes a full range of outcomes (a gamma curve for yards, a normal curve for QB passing volume, and count distributions for catches, carries, and touchdowns). That range gives the chance of going over or under any line, including pushes on whole-number lines.</li>
+        <li><strong>Edge.</strong> Same rule as the game picks: expected value = win chance × payout − loss chance. A side is suggested when that's at least your minimum edge.</li>
+      </ol>
+      <h3>How accurate is it?</h3>
+      <p>Tested walk-forward on the 2025 season and the first six weeks of 2026, where every projection used only earlier games. Projections were about 2–4% more accurate than a player's simple last-8-game average. When the model said 45% or 55% at a line, the actual rate was within about 3 points. It's well calibrated, not magic: sportsbooks set prop lines with similar information, so real edges are usually small and rare.</p>
+      <p class="disclaimer">For education and entertainment. Prop lines are set by professionals and include the book's margin. Injuries, weather, and role changes the stats don't show yet can make a projection wrong. Never bet more than you can afford to lose. Need help? Call 1-800-GAMBLER.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="model.js"></script>
+  <script src="props-model.js"></script>
+  <script src="track.js"></script>
+  <script src="props.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

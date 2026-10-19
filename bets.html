@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Bets · GridIron Edge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>GridIron Edge</h1>
+    <p class="tagline">Every bet you've placed, settled automatically when results come in</p>
+    <nav class="site-nav" aria-label="Pages">
+      <a href="index.html">Game picks</a>
+      <a href="props.html">Player props</a>
+      <a href="bets.html" aria-current="page">My bets</a>
+    </nav>
+    <nav class="nav" aria-label="On this page">
+      <a href="#sum-h">Summary</a>
+      <a href="#add-h">Add a bet</a>
+      <a href="#list-h">All bets</a>
+    </nav>
+  </header>
+
+  <main class="wrap" hidden>
+    <p id="status" class="status" role="status">Loading your bets…</p>
+
+    <section class="card" aria-labelledby="sum-h">
+      <div class="row-head">
+        <h2 id="sum-h">Summary</h2>
+        <label class="inline">Show
+          <select id="f-kind"><option value="">All bets</option><option value="game">Game bets</option><option value="prop">Player props</option></select>
+        </label>
+      </div>
+      <div id="tiles" class="tiles"></div>
+      <div id="chart" class="chart"></div>
+      <p class="explain">Profit counts settled bets only: a win pays your stake times the odds, a loss costs the stake, and pushes and voids return it. Bets tracked from the Game picks or Player props pages settle themselves once the final score or stat line is posted.</p>
+    </section>
+
+    <section class="card" aria-labelledby="add-h">
+      <h2 id="add-h">Add a bet</h2>
+      <p class="explain">For bets you placed on your own. Use the <strong>Track bet</strong> buttons on the Game picks and Player props pages to add the model's picks with the details filled in.</p>
+      <form id="add" class="calc">
+        <label><span>Type</span><select id="a-kind"><option value="game">Game bet</option><option value="prop">Player prop</option></select></label>
+        <label class="wide-field"><span>Bet</span><input id="a-desc" type="text" maxlength="200" required placeholder="e.g. Chiefs -3.5 or Kelce over 5.5 receptions"></label>
+        <label><span>Odds (American)</span><input id="a-odds" type="number" step="1" value="-110" required></label>
+        <label><span>Stake ($)</span><input id="a-stake" type="number" min="0" step="1" value="10" required></label>
+        <label><span>Date placed</span><input id="a-date" type="date" required></label>
+        <label><span>Result</span><select id="a-result"><option value="pending">Pending</option><option value="win">Win</option><option value="loss">Loss</option><option value="push">Push</option><option value="void">Void</option></select></label>
+        <label class="wide-field"><span>Notes (optional)</span><input id="a-notes" type="text" maxlength="500"></label>
+        <div class="form-end"><button type="submit" class="primary">Add bet</button></div>
+      </form>
+      <p id="add-msg" class="auth-msg" role="status"></p>
+    </section>
+
+    <section class="card" aria-labelledby="list-h">
+      <div class="row-head">
+        <h2 id="list-h">All bets</h2>
+        <label class="inline">Status
+          <select id="f-status"><option value="">All</option><option value="pending">Pending</option><option value="settled">Settled</option></select>
+        </label>
+      </div>
+      <p class="explain">Change a result or stake right in the table. It saves as soon as you change it.</p>
+      <div class="scroll"><table id="list" class="table"></table></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="model.js"></script>
+  <script src="props-model.js"></script>
+  <script src="track.js"></script>
+  <script src="bets.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

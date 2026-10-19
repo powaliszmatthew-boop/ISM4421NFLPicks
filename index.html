@@ -10,7 +10,12 @@
   <header class="topbar">
     <h1>GridIron Edge</h1>
     <p class="tagline">NFL picks from week-to-week statistics and a model that keeps learning</p>
-    <nav class="nav">
+    <nav class="site-nav" aria-label="Pages">
+      <a href="index.html" aria-current="page">Game picks</a>
+      <a href="props.html">Player props</a>
+      <a href="bets.html">My bets</a>
+    </nav>
+    <nav class="nav" aria-label="On this page">
       <a href="#picks-h">Picks</a>
       <a href="#money-h">Where the money is</a>
       <a href="#games-h">All games</a>
@@ -18,28 +23,7 @@
       <a href="#power-h">Rankings</a>
       <a href="#key-h" class="key-link">Key: what everything means</a>
     </nav>
-    <div id="account" class="account" hidden>
-      <span id="user-email"></span>
-      <button id="signout" type="button">Sign out</button>
-    </div>
   </header>
-
-  <section id="auth" class="auth wrap" aria-labelledby="auth-title" hidden>
-    <form id="auth-form" class="card auth-card">
-      <h2 id="auth-title">Sign in</h2>
-      <label id="auth-email-row">
-        <span>Email</span>
-        <input id="auth-email" type="email" autocomplete="email" required>
-      </label>
-      <label id="auth-password-row">
-        <span>Password</span>
-        <input id="auth-password" type="password" minlength="6" autocomplete="current-password" required>
-      </label>
-      <button id="auth-submit" type="submit" class="primary">Sign in</button>
-      <p id="auth-msg" class="auth-msg" role="status"></p>
-      <div id="auth-links" class="auth-links"></div>
-    </form>
-  </section>
 
   <main class="wrap" hidden>
     <p id="status" class="status" role="status">Loading NFL results and betting lines…</p>
@@ -164,6 +148,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
   <script src="config.js"></script>
   <script src="model.js"></script>
+  <script src="track.js"></script>
   <script src="app.js"></script>
   <script src="auth.js"></script>
 </body>
