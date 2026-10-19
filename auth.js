@@ -100,6 +100,7 @@
     q("#user-email").textContent = u.email;
     if (firstLoad && hasSettings) await loadSettings();
     main.hidden = false;
+    document.dispatchEvent(new CustomEvent("gridiron:auth", { detail: { user: u } }));
     if (window.GridIron) window.GridIron.start(u);
   }
 
@@ -210,6 +211,7 @@
       if (session) { showApp(session.user); return; }
       user = null;
       window.GridIronAuth.user = null;
+      document.dispatchEvent(new CustomEvent("gridiron:auth", { detail: { user: null } }));
       showAuth("signin");
       if (linkError) {
         say(`${linkError}. Request a new link below.`, "error");

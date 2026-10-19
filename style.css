@@ -241,3 +241,67 @@ button:hover { border-color: var(--accent); }
 .toast.error { background: var(--neg); }
 @media (prefers-color-scheme: dark) { .toast.ok, .toast.error { color: #0d141e; } }
 @media (max-width: 560px) { .calc .wide-field { grid-column: span 1; } }
+
+/* Track / + Parlay button pair */
+.bet-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.slip-btn {
+  padding: 6px 10px; border-radius: 8px; border: 1px dashed var(--muted); font: inherit; font-size: .85rem;
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.slip-btn:hover { border-style: solid; }
+.bet-actions .track-btn, .bet-actions .slip-btn { padding: 4px 10px; font-size: .82rem; }
+.badge.PARLAY { background: #6a4c93; }
+.warn { color: var(--accent); font-weight: 600; }
+
+/* Every side of a game, tucked into a disclosure */
+.side-menu summary { cursor: pointer; font-size: .85rem; font-weight: 600; white-space: nowrap; }
+.side-menu ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; min-width: 300px; }
+.side-menu li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; white-space: normal; }
+
+/* Top plays */
+.plays { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
+.play { border: 1px solid var(--border); border-left: 4px solid var(--pos); border-radius: 10px; padding: 12px; }
+.play-head { margin-bottom: 4px; }
+.play-line { margin: 4px 0 2px; }
+.play-sub { margin: 0 0 8px; }
+.miles { display: grid; gap: 6px; }
+.mile-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.play .link { margin-top: 8px; }
+.outlook-head { font-size: 1.05rem; margin: 6px 0 10px; }
+
+/* Parlay legs in My bets */
+.legs { margin: 6px 0 4px; padding-left: 18px; font-size: .88rem; display: grid; gap: 4px; }
+.legs li > * { vertical-align: middle; }
+.legs select { margin-left: 6px; padding: 2px 4px; font-size: .8rem; }
+.odds-input { width: 80px; }
+
+/* Parlay slip */
+.slip { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100vw - 32px); }
+.slip-toggle {
+  border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer;
+  background: var(--navy); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+.slip-count { display: inline-block; min-width: 22px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #17202c; }
+.slip.open .slip-toggle { display: none; }
+.slip-panel {
+  order: -1; width: 360px; max-width: 100%; max-height: min(70vh, 640px); overflow-y: auto;
+  background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+.slip-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.slip-legs { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 8px; }
+.slip-legs li > div { display: inline; }
+.slip-legs li { position: relative; padding-right: 22px; }
+.slip-legs li .link { position: absolute; right: 0; top: 0; text-decoration: none; }
+.slip-custom { display: flex; gap: 6px; margin: 6px 0 10px; }
+.slip-custom input { min-width: 0; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: .85rem; }
+.slip-custom input[name="desc"] { flex: 1; }
+.slip-custom input[name="odds"] { width: 76px; }
+.slip-sum { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 8px 0; }
+.slip-sum dt { font-size: .72rem; color: var(--muted); }
+.slip-sum dd { margin: 0; font-weight: 700; }
+.slip-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+.slip-fields label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; }
+.slip-fields input { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
+.slip-buttons { display: flex; align-items: center; gap: 12px; }
+@media (prefers-color-scheme: dark) { .slip-toggle { background: var(--accent); color: #17202c; } .slip-count { background: #17202c; color: var(--accent); } }

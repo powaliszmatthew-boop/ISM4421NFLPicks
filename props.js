@@ -160,7 +160,7 @@ function renderMine() {
       </dl>
       <ul class="why">${reasonsFor(row, pr).map(r => `<li>${T.esc(r)}</li>`).join("")}</ul>
       <div class="card-actions">
-        <button type="button" class="track-btn" data-track="${row.id}">Track ${SIDE[b.side].toLowerCase()}</button>
+        ${T.actions(propBet(row, pr, b, stake || null), { track: `Track ${SIDE[b.side].toLowerCase()}` })}
         <button type="button" class="link" data-edit="${row.id}">Edit</button>
         <button type="button" class="link" data-del="${row.id}">Delete</button>
       </div>`;
@@ -170,11 +170,7 @@ function renderMine() {
 
 $("#mine").addEventListener("click", async e => {
   const t = e.target;
-  if (t.dataset.track) {
-    const row = saved.find(r => r.id === t.dataset.track), pr = price(row);
-    const stake = stakeFor(pr.ev.best) || settings().bankroll * 0.01;
-    T.trackButton(t, propBet(row, pr, pr.ev.best, stake));
-  } else if (t.dataset.edit) {
+  if (t.dataset.edit) {
     editInCalc(saved.find(r => r.id === t.dataset.edit));
   } else if (t.dataset.del) {
     if (!confirm("Delete this saved prop?")) return;
@@ -258,8 +254,8 @@ function renderCalc() {
     <div class="calc-actions">
       <label class="inline">Stake ($) <input id="c-stake" type="number" min="0" step="1" value="${(stake || s.bankroll * 0.01).toFixed(2)}"></label>
       <button type="button" class="primary small-btn" id="c-save">${editingId ? "Update saved prop" : "Save to my props"}</button>
-      <button type="button" class="track-btn" data-side="over">Track over</button>
-      <button type="button" class="track-btn" data-side="under">Track under</button>
+      ${T.actions(() => calcBet("over"), { track: "Track over" })}
+      ${T.actions(() => calcBet("under"), { track: "Track under" })}
       ${editingId ? '<button type="button" class="link" id="c-cancel">Cancel edit</button>' : ""}
     </div>`;
 }
@@ -284,15 +280,20 @@ $("#calc-out").addEventListener("click", async e => {
     await loadSaved();
     renderMine();
     renderCalc();
-  } else if (t.dataset.side) {
-    const side = PM.evaluate(c.proj, c.line, c.over, c.under).sides.find(x => x.side === t.dataset.side);
-    const stake = Math.max(0, Number($("#c-stake").value) || 0);
-    T.trackButton(t, propBet(row, { pl: c.pl }, side, stake));
   } else if (t.id === "c-cancel") {
     editingId = null;
     renderCalc();
   }
 });
+
+// The calculator's current prop as a bet on one side, read when the button is pressed.
+function calcBet(sideName) {
+  const c = calcInputs(), g = c.pl.game;
+  const row = { season: g.season, week: g.week, game_id: g.id, player_id: c.pl.id, player_name: c.pl.name,
+    stat: c.key, line: c.line };
+  const side = PM.evaluate(c.proj, c.line, c.over, c.under).sides.find(x => x.side === sideName);
+  return propBet(row, { pl: c.pl }, side, Math.max(0, Number($("#c-stake").value) || 0));
+}
 
 function editInCalc(row) {
   if (!upcomingGames.some(g => g.id === row.game_id)) return;
@@ -350,6 +351,161 @@ $("#proj").addEventListener("click", e => {
 $("#p-more").addEventListener("click", () => { showAllProj = true; renderProj(); });
 for (const id of ["#p-stat", "#p-pos"]) $(id).addEventListener("change", () => { showAllProj = false; renderProj(); });
 $("#p-search").addEventListener("input", () => { showAllProj = false; renderProj(); });
+
+// ---- Top plays & player outlook -----------------------------------------------
+const TOP_ROWS = 12;
+let topLimit = TOP_ROWS;
+const isTd = key => key === "anytime_td";
+const fmtVal = (x, key) => (PM.STATS[key].kind === "yards" ? String(Math.round(x)) : (Math.round(x * 10) / 10).toString());
+const recent = (id, key, n = 5) => {
+  const log = model.log(id, n);
+  return log.length ? log.reduce((a, g) => a + PM.STATS[key].f(g.s), 0) / log.length : null;
+};
+// Enough volume to be worth listing.
+const relevant = (proj, key) => isTd(key) || (PM.STATS[key].kind === "yards" ? proj.mean >= 15 : proj.mean >= 0.8);
+
+// A milestone ("75+ rushing yards", "anytime TD") as a bet at the model's fair odds.
+function milestoneBet(pl, key, m) {
+  const st = PM.STATS[key], g = pl.game;
+  const label = isTd(key) ? "anytime TD" : `${m.at}+ ${st.short.toLowerCase()}`;
+  return {
+    kind: "prop", description: `${pl.name} ${label} (${g.away} @ ${g.home})`, odds: PM.fairOdds(m.prob),
+    model_prob: Number(m.prob.toFixed(5)), market: "PROP", side: "over", line: m.at - 0.5,
+    player_id: pl.id, player_name: pl.name, stat: key, season: g.season, week: g.week, game_id: g.id,
+  };
+}
+
+function milestoneRows(pl, key, proj) {
+  return PM.milestones(proj).filter(m => PM.fairOdds(m.prob) != null).map(m => {
+    const b = milestoneBet(pl, key, m);
+    return `<div class="mile-row"><span><strong>${isTd(key) ? "Scores a TD" : `${m.at}+`}</strong> ${pct(m.prob)}
+      <span class="muted small">fair ${T.fmtOdds(b.odds)}</span></span>${T.actions(b)}</div>`;
+  }).join("");
+}
+
+function renderPlays() {
+  const key = $("#t-stat").value, pos = $("#t-pos").value, st = PM.STATS[key];
+  const list = players.filter(p => p.props[key] && (!pos || p.pos === pos) && relevant(p.props[key], key))
+    .map(p => ({ p, proj: p.props[key], score: isTd(key) ? PM.lineProbs(p.props[key], 0.5).over : p.props[key].mean }))
+    .sort((a, b) => b.score - a.score);
+  $("#plays").innerHTML = list.slice(0, topLimit).map(({ p, proj }) => {
+    const g = p.game, avg5 = recent(p.id, key);
+    let headline, sub;
+    if (isTd(key)) {
+      const tds = model.log(p.id, 5).reduce((a, x) => a + st.f(x.s), 0);
+      headline = `Chance to score: <strong>${pct(PM.lineProbs(proj, 0.5).over)}</strong>`;
+      sub = `${tds} TD${tds === 1 ? "" : "s"} in his last ${Math.min(5, model.log(p.id, 5).length)} games`;
+    } else {
+      const med = PM.quantile(proj, 0.5), lo = PM.quantile(proj, 0.25), hi = PM.quantile(proj, 0.75);
+      headline = `Most likely: <strong>${med} ${st.short.toLowerCase()}</strong> <span class="muted small">(typical range ${lo}–${hi})</span>`;
+      sub = avg5 == null ? "No recent games" :
+        `Last ${Math.min(5, model.log(p.id, 5).length)} games: ${fmtVal(avg5, key)} avg · model expects ${fmtVal(proj.mean, key)} avg (${signed((proj.mean / Math.max(avg5, 0.01) - 1) * 100, 0)}%)`;
+    }
+    return `<article class="play">
+      <div class="play-head"><strong>${T.esc(p.name)}</strong> <span class="muted small">${p.pos} · ${p.team} ${p.team === g.home ? "vs" : "@"} ${p.opp} · ${kickoff(g)}</span></div>
+      <p class="play-line">${headline}</p>
+      <p class="muted small play-sub">${sub}</p>
+      <div class="miles">${milestoneRows(p, key, proj)}</div>
+      <button type="button" class="link small" data-outlook="${p.id}" data-game="${g.id}">Full outlook</button>
+    </article>`;
+  }).join("") || '<p class="muted">No players to show for this prop.</p>';
+  $("#t-more").hidden = list.length <= topLimit;
+  $("#t-more").textContent = `Show more (${list.length - topLimit} left)`;
+}
+
+$("#t-stat").addEventListener("change", () => { topLimit = TOP_ROWS; renderPlays(); });
+$("#t-pos").addEventListener("change", () => { topLimit = TOP_ROWS; renderPlays(); });
+$("#t-more").addEventListener("click", () => { topLimit += TOP_ROWS; renderPlays(); });
+$("#plays").addEventListener("click", e => {
+  if (!e.target.dataset.outlook) return;
+  showOutlook(e.target.dataset.outlook, e.target.dataset.game);
+  $("#outlook-h").scrollIntoView({ behavior: "smooth" });
+});
+
+const optionLabel = p => `${p.name} (${p.pos}, ${p.team} ${p.team === p.game.home ? "vs" : "@"} ${p.opp}, Wk ${p.game.week})`;
+const LOG_COLS = {
+  QB: [["Cmp/Att", s => `${s.completions}/${s.attempts}`], ["Pass yds", s => s.passing_yards], ["Pass TD", s => s.passing_tds],
+    ["INT", s => s.passing_interceptions], ["Rush yds", s => s.rushing_yards]],
+  RB: [["Car", s => s.carries], ["Rush yds", s => s.rushing_yards], ["Rec", s => s.receptions], ["Rec yds", s => s.receiving_yards],
+    ["TD", s => s.rushing_tds + s.receiving_tds]],
+  WR: [["Tgt", s => s.targets], ["Rec", s => s.receptions], ["Rec yds", s => s.receiving_yards], ["Rush yds", s => s.rushing_yards],
+    ["TD", s => s.rushing_tds + s.receiving_tds]],
+};
+LOG_COLS.TE = LOG_COLS.WR;
+
+function showOutlook(id, gameId) {
+  const p = findPlayer(id, gameId);
+  if (!p) { $("#outlook").innerHTML = '<p class="muted">Pick a player from the list.</p>'; return; }
+  $("#o-search").value = optionLabel(p);
+  const g = p.game, log = model.log(p.id, 6);
+  const rows = Object.entries(p.props).map(([key, proj]) => {
+    const st = PM.STATS[key], avg5 = recent(p.id, key), last = log[0] ? st.f(log[0].s) : null;
+    const likely = isTd(key) ? `${pct(PM.lineProbs(proj, 0.5).over)} chance` : `${PM.quantile(proj, 0.5)}`;
+    const range = isTd(key) ? "–" : `${PM.quantile(proj, 0.25)}–${PM.quantile(proj, 0.75)}`;
+    return `<tr><td><strong>${st.label}</strong></td><td>${likely}</td><td>${range}</td>
+      <td>${avg5 == null ? "–" : fmtVal(avg5, key)}</td><td>${last ?? "–"}</td>
+      <td class="wrap-cell"><div class="miles">${milestoneRows(p, key, proj)}</div></td></tr>`;
+  }).join("");
+  const cols = LOG_COLS[p.pos];
+  $("#outlook").innerHTML = `
+    <p class="outlook-head"><strong>${T.esc(p.name)}</strong> · ${p.pos} · ${p.team} ${p.team === g.home ? "vs" : "@"} ${p.opp} · Week ${g.week}, ${kickoff(g)}</p>
+    <div class="scroll"><table class="table"><thead><tr><th>Prop</th><th>Most likely</th><th>Typical range</th><th>Last 5 avg</th>
+      <th>Last game</th><th>Milestones</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <h3>Recent games</h3>
+    <div class="scroll"><table class="table"><thead><tr><th>Week</th><th>Opp</th>${cols.map(c => `<th>${c[0]}</th>`).join("")}</tr></thead>
+      <tbody>${log.map(x => `<tr><td>${x.season} Wk ${x.week}</td><td>${x.opp}</td>${cols.map(c => `<td>${c[1](x.s)}</td>`).join("")}</tr>`).join("") ||
+        `<tr><td colspan="${cols.length + 2}" class="muted">No games yet.</td></tr>`}</tbody></table></div>`;
+}
+
+function fillOutlookList() {
+  $("#o-players").innerHTML = players.filter(p => Object.keys(p.props).length)
+    .map(p => `<option value="${T.esc(optionLabel(p))}"></option>`).join("");
+}
+
+$("#o-search").addEventListener("change", () => {
+  const p = players.find(x => optionLabel(x) === $("#o-search").value);
+  if (p) showOutlook(p.id, p.game.id);
+});
+
+// ---- Model report card ---------------------------------------------------------
+function reportFor(preds) {
+  const r = { n: 0, inside: 0, bins: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], tdExp: 0, tdAct: 0, tdN: 0 };
+  for (const b of preds) {
+    if (b.games < 3 || !relevant(b, b.key)) continue;
+    if (isTd(b.key)) {
+      const prob = PM.lineProbs(b, 0.5).over;
+      r.tdExp += prob; r.tdAct += b.actual > 0 ? 1 : 0; r.tdN++;
+      continue;
+    }
+    // Yardage results inside the typical range (middle half of outcomes). Whole-number stats
+    // like catches land on the range's edges often, so they'd overstate this and are left out.
+    if (b.kind === "yards") {
+      const u = PM.lineProbs(b, b.actual).under;
+      r.n++;
+      if (u >= 0.25 && u <= 0.75) r.inside++;
+    }
+    for (const m of PM.milestones(b)) {
+      const bin = r.bins[m.prob < 0.4 ? 0 : m.prob < 0.6 ? 1 : 2];
+      bin[0] += m.prob; bin[1] += b.actual >= m.at ? 1 : 0; bin[2]++;
+    }
+  }
+  return r;
+}
+
+function renderReport() {
+  if (!model.last) { $("#report").innerHTML = ""; return; }
+  const { season, week } = model.last;
+  const tile = (label, value, note = "") => `<div class="tile"><div class="muted small">${label}</div><div class="big">${value}</div>${note ? `<div class="muted small">${note}</div>` : ""}</div>`;
+  const block = (title, r) => `<h3>${title}</h3><div class="tiles">
+    ${tile("Yardage inside typical range", r.n ? pct(r.inside / r.n) : "–", "target about 50%")}
+    ${r.bins.map((b, i) => tile(["Long shots (under 40%)", "Coin flips (40–60%)", "Likely (60%+)"][i],
+      b[2] ? `${pct(b[1] / b[2])} hit` : "–", b[2] ? `model said ${pct(b[0] / b[2])} · ${b[2].toLocaleString()} milestones` : "")).join("")}
+    ${tile("Anytime TD scorers", r.tdN ? `${r.tdAct} scored` : "–", r.tdN ? `model expected ${r.tdExp.toFixed(0)} of ${r.tdN}` : "")}
+  </div>`;
+  const lastWeek = reportFor(model.backtest.filter(b => b.season === season && b.week === week));
+  const seasonToDate = reportFor(model.backtest.filter(b => b.season === season));
+  $("#report").innerHTML = block(`${season} Week ${week}`, lastWeek) + block(`${season} season to date`, seasonToDate);
+}
 
 // ---- Past props ------------------------------------------------------------
 function renderPast() {
@@ -417,6 +573,12 @@ async function init() {
   }
   $("#p-stat").innerHTML = Object.entries(PM.STATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
   $("#p-stat").value = "rec_yds";
+  $("#t-stat").innerHTML = $("#p-stat").innerHTML;
+  $("#t-stat").value = "anytime_td";
+  renderPlays();
+  fillOutlookList();
+  showOutlook(null);
+  renderReport();
   fillGames();
   fillPlayers();
   fillStats();

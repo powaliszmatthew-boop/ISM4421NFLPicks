@@ -86,6 +86,10 @@
   // calibration curve (see "calib" below) has been applied.
   function lineProbs(proj, line) {
     const raw = rawProbs(proj, line);
+    if (proj.pcal && line === STATS[proj.key].fixedLine) {
+      const over = mapProb(proj.pcal, raw.over);
+      return { over, push: 0, under: 1 - over };
+    }
     if (!proj.calib) return raw;
     const under = calibrate(proj.calib, raw.under);
     const atOrUnder = raw.push ? calibrate(proj.calib, raw.under + raw.push) : under;
@@ -102,6 +106,23 @@
     let below = 0;
     for (let k = 0; k < i; k++) below += hist[k];
     return (below + hist[i] * (x - i)) / total;
+  }
+
+  // Yes/no props (anytime TD) are calibrated directly: of the times the model said
+  // about p, how often did it happen? Ten buckets, kept increasing, read between centers.
+  const PCAL_BINS = 10, PCAL_PRIOR = 3;
+  function mapProb(bins, p) {
+    const rates = [];
+    for (let i = 0; i < PCAL_BINS; i++) {
+      const center = (i + 0.5) / PCAL_BINS;
+      const r = (bins[i][0] + PCAL_PRIOR * center) / (bins[i][1] + PCAL_PRIOR);
+      rates.push(i ? Math.max(r, rates[i - 1]) : r);
+    }
+    const x = Math.min(1, Math.max(0, p)) * PCAL_BINS - 0.5;
+    if (x <= 0) return rates[0] * (p * PCAL_BINS * 2);   // scale down toward 0 below the first center
+    if (x >= PCAL_BINS - 1) return rates[PCAL_BINS - 1];
+    const i = Math.floor(x);
+    return rates[i] + (rates[i + 1] - rates[i]) * (x - i);
   }
 
   function rawProbs(proj, line) {
@@ -212,6 +233,7 @@
     const spread = {};          // stat|pos|tier -> { err2, scale, n }
     const bias = {};            // stat|pos|tier -> [sumActual, sumProjected, n]
     const calib = {};           // stat|pos|tier -> histogram of where results fell
+    const pcal = {};            // stat|pos -> [hits, n] per probability bucket, for yes/no props
     const backtest = [];
 
     const ew = (acc, x, decay) => { acc[0] = acc[0] * decay + 1; acc[1] = acc[1] * decay + x; };
@@ -247,12 +269,14 @@
       }
       const mean = raw * biasFactor;
       const sp = spread[tk];
-      const cal = calib[tk] && calib[tk].n >= 50 ? calib[tk].hist : null;
+      const yesNo = st.fixedLine != null;
+      const cal = !yesNo && calib[tk] && calib[tk].n >= 50 ? calib[tk].hist : null;
+      const pc = yesNo && pcal[`${key}|${pl.pos}`] && pcal[`${key}|${pl.pos}`].n >= 100 ? pcal[`${key}|${pl.pos}`].bins : null;
       let spreadVal = START_SPREAD[st.kind];
       if (sp && sp.n >= 30) spreadVal = st.kind === "yards" ? Math.sqrt(sp.err2 / sp.scale) : sp.err2 / sp.scale;
       return { id, name: pl.name, pos: pl.pos, team, opp, key, label: st.label, kind: st.kind,
         mean, spread: Math.max(spreadVal, st.kind === "yards" ? 0.25 : 0.3),
-        calib: cal, games: pr ? pr.n : 0, base, defFactor, envFactor, biasFactor, raw, tierKey: tk, implied: imp ?? null };
+        calib: cal, pcal: pc, games: pr ? pr.n : 0, base, defFactor, envFactor, biasFactor, raw, tierKey: tk, implied: imp ?? null };
     }
 
     function learn(weekRows) {
@@ -260,6 +284,16 @@
       for (const b of weekRows.preds) {
         const bs = bias[b.tierKey] || (bias[b.tierKey] = [0, 0, 0]);
         bs[0] = bs[0] * 0.995 + b.actual; bs[1] = bs[1] * 0.995 + b.raw; bs[2] = bs[2] * 0.995 + 1;
+        if (STATS[b.key].fixedLine != null) {
+          const pk = `${b.key}|${b.pos}`;
+          const pc = pcal[pk] || (pcal[pk] = { bins: Array.from({ length: PCAL_BINS }, () => [0, 0]), n: 0 });
+          const p = rawProbs({ ...b, calib: null, pcal: null }, STATS[b.key].fixedLine).over;
+          for (const bin of pc.bins) { bin[0] *= 0.998; bin[1] *= 0.998; }
+          const bin = pc.bins[Math.min(PCAL_BINS - 1, Math.floor(p * PCAL_BINS))];
+          bin[0] += b.actual > STATS[b.key].fixedLine ? 1 : 0;
+          bin[1] += 1;
+          pc.n++;
+        }
         // Where the result fell in the uncalibrated distribution (midpoint for whole numbers).
         const c = calib[b.tierKey] || (calib[b.tierKey] = { hist: new Array(CALIB_BINS).fill(CALIB_PRIOR), n: 0 });
         const plain = { ...b, calib: null };
@@ -335,8 +369,12 @@
 
     const last = weeks[weeks.length - 1];
     const byGame = new Map(rows.map(r => [`${r.id}|${r.season}|${r.week}`, r]));
+    const byPlayer = new Map();
+    for (const r of rows) (byPlayer.get(r.id) || byPlayer.set(r.id, []).get(r.id)).push(r);
     return {
       players, player, backtest, last: last ? { season: last.season, week: last.week } : null,
+      // A player's most recent games, newest first: { season, week, team, opp, s }.
+      log: (id, n = 6) => (byPlayer.get(id) || []).slice(-n).reverse(),
       // What a player actually recorded in a week, or null if they have no stat line.
       actual: (id, season, week, key) => {
         const r = byGame.get(`${id}|${season}|${week}`);
@@ -382,6 +420,39 @@
     return out;
   }
 
+  // The value with chance q of the result landing at or below it (q = 0.5 is the median).
+  function quantile(proj, q) {
+    if (proj.kind === "count" || STATS[proj.key].fixedLine != null) {
+      for (let k = 0; k <= Math.ceil(proj.mean * 6) + 5; k++) if (lineProbs(proj, k + 0.5).under >= q) return k;
+      return Math.ceil(proj.mean * 6) + 5;
+    }
+    let lo = 0, hi = Math.max(10, proj.mean * 6);
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (lineProbs(proj, mid).under < q) lo = mid; else hi = mid;
+    }
+    return Math.round(lo);
+  }
+
+  // Common milestone props ("50+ rushing yards") for each stat.
+  const LADDERS = {
+    pass_yds: [150, 175, 200, 225, 250, 275, 300, 325, 350], pass_att: [25, 30, 35, 40, 45], completions: [15, 18, 20, 22, 25, 28, 30],
+    pass_tds: [1, 2, 3, 4], ints: [1, 2], rush_yds: [10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 125],
+    rush_att: [5, 8, 10, 12, 15, 18, 20, 25], receptions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    rec_yds: [10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 125], rush_rec_yds: [25, 40, 50, 60, 75, 90, 100, 125, 150],
+    anytime_td: [1],
+  };
+  // Three milestones around the projection: one likely, one near even, one a stretch.
+  // Each is { at, prob } where prob is the chance of at least `at`.
+  function milestones(proj) {
+    const ladder = LADDERS[proj.key];
+    const all = ladder.map(at => ({ at, prob: lineProbs(proj, at - 0.5).over })).filter(m => m.prob >= 0.08 && m.prob <= 0.95);
+    if (all.length <= 3) return all;
+    const near = (target) => all.reduce((a, b) => (Math.abs(b.prob - target) < Math.abs(a.prob - target) ? b : a));
+    const picks = [near(0.75), near(0.5), near(0.25)];
+    return [...new Map(picks.map(m => [m.at, m])).values()].sort((a, b) => a.at - b.at);
+  }
+
   // The line a book would likely post: the projection's median, on a half point.
   function fairLine(proj) {
     if (STATS[proj.key].fixedLine != null) return STATS[proj.key].fixedLine;
@@ -401,7 +472,8 @@
     return Math.max(0.5, Math.round(lo - 0.5) + 0.5);
   }
 
-  const api = { PARAMS, STATS, run, upcoming, evaluate, lineProbs, fairLine, fairOdds, decimalOdds, impliedProb, fmtOdds };
+  const api = { PARAMS, STATS, LADDERS, run, upcoming, evaluate, lineProbs, quantile, milestones, fairLine, fairOdds,
+                decimalOdds, impliedProb, fmtOdds };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.PropsModel = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -6,29 +6,55 @@ const pct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
 const money = x => `${x < 0 ? "−" : ""}$${Math.abs(x).toFixed(2)}`;
 const STATS_URL = "/.netlify/functions/player-stats";
 const RESULTS = { pending: "Pending", win: "Win", loss: "Loss", push: "Push", void: "Void" };
-const KIND = { game: "Game", prop: "Prop" };
+const KIND = { game: "Game", prop: "Prop", parlay: "Parlay" };
+const BADGE = { game: "ATS", prop: "PROP", parlay: "PARLAY" };
 
 let bets = [];
 
 const db = () => window.GridIronAuth.client;
 const today = () => new Date().toLocaleDateString("en-CA");   // YYYY-MM-DD in local time
+const oddsOk = am => Number.isInteger(am) && (am <= -100 || am >= 100);
+
+// ---- Parlay math -------------------------------------------------------------
+// A parlay loses if any leg loses and wins once every leg is decided with at least one win.
+// Pushed or voided legs drop out, and the payout uses only the legs that won.
+function parlayResult(legs) {
+  if (legs.some(l => l.result === "loss")) return "loss";
+  if (legs.some(l => l.result === "pending")) return "pending";
+  return legs.some(l => l.result === "win") ? "win" : "push";
+}
+
+function payoutOdds(b) {
+  if (b.kind !== "parlay" || !b.legs.some(l => l.result === "push" || l.result === "void")) return b.odds;
+  return T.american(b.legs.filter(l => l.result === "win").reduce((a, l) => a * T.decimal(l.odds), 1));
+}
 
 function profit(b) {
-  if (b.result === "win") return b.stake * (PM.decimalOdds(b.odds) - 1);
+  if (b.result === "win") return b.stake * (T.decimal(payoutOdds(b)) - 1);
   if (b.result === "loss") return -b.stake;
   return 0;
 }
 
+const num = v => (v == null ? null : Number(v));
+
 async function loadBets() {
-  const { data, error } = await db().from("bets").select("*")
+  const { data, error } = await db().from("bets").select("*, bet_legs(*)")
     .order("placed_on", { ascending: false }).order("created_at", { ascending: false });
   if (error) throw error;
-  bets = data.map(b => ({ ...b, stake: Number(b.stake), line: b.line == null ? null : Number(b.line),
-    model_prob: b.model_prob == null ? null : Number(b.model_prob), edge: b.edge == null ? null : Number(b.edge) }));
+  bets = data.map(b => ({
+    ...b, stake: Number(b.stake), line: num(b.line), model_prob: num(b.model_prob), edge: num(b.edge),
+    legs: (b.bet_legs || []).map(l => ({ ...l, line: num(l.line), model_prob: num(l.model_prob) }))
+      .sort((x, y) => x.position - y.position),
+  }));
 }
 
 // ---- Automatic settling -----------------------------------------------------
 // Game bets settle from final scores; props from the player's stat line once the game is final.
+// The same rules grade single bets and parlay legs.
+const canAutoGrade = b => b.result === "pending" && b.game_id && b.side && (
+  (b.kind === "game" && b.market && (b.market === "ML" || b.line != null)) ||
+  (b.kind === "prop" && b.player_id && b.stat && PM.STATS[b.stat] && b.line != null));
+
 function gradeGame(b, g) {
   const margin = g.homeScore - g.awayScore;
   if (b.market === "ML") return margin === 0 ? "push" : (margin > 0) === (b.side === "home") ? "win" : "loss";
@@ -40,14 +66,37 @@ function gradeGame(b, g) {
   return total === b.line ? "push" : (total > b.line) === (b.side === "over") ? "win" : "loss";
 }
 
+// Returns "waiting" when the game is final but the player has no stat line yet.
+function grade(b, games, stats) {
+  const g = games.get(b.game_id);
+  if (!g || !g.played) return null;
+  if (b.kind === "game") return gradeGame(b, g);
+  if (!stats) return null;
+  const s = stats.get(`${b.player_id}|${b.season}|${b.week}`);
+  if (!s) return "waiting";
+  const actual = PM.STATS[b.stat].f(s);
+  return actual === b.line ? "push" : (actual > b.line) === (b.side === "over") ? "win" : "loss";
+}
+
+async function setParlayFromLegs(b) {
+  const result = parlayResult(b.legs);
+  if (result === b.result) return false;
+  const { error } = await db().from("bets")
+    .update({ result, settled_at: result === "pending" ? null : new Date().toISOString() }).eq("id", b.id);
+  if (error) return false;
+  b.result = result;
+  return true;
+}
+
 async function autoSettle() {
-  const pending = bets.filter(b => b.result === "pending" && b.game_id && b.side && (
-    (b.kind === "game" && b.market && (b.market === "ML" || b.line != null)) ||
-    (b.kind === "prop" && b.player_id && b.stat && PM.STATS[b.stat] && b.line != null)));
-  if (!pending.length) return { settled: 0, waiting: 0 };
+  const singles = bets.filter(b => b.kind !== "parlay" && canAutoGrade(b));
+  const parlays = bets.filter(b => b.kind === "parlay" && b.result === "pending");
+  const legs = parlays.flatMap(b => b.legs.filter(canAutoGrade));
+  const items = [...singles, ...legs];
+  if (!items.length) return { settled: 0, waiting: 0 };
   const games = new Map((await M.load()).map(g => [g.id, g]));
   let stats = null;
-  if (pending.some(b => b.kind === "prop")) {
+  if (items.some(b => b.kind === "prop")) {
     const res = await fetch(STATS_URL);
     const body = await res.json().catch(() => ({}));
     if (res.ok && Array.isArray(body.rows)) {
@@ -59,20 +108,23 @@ async function autoSettle() {
     }
   }
   let settled = 0, waiting = 0;
-  for (const b of pending) {
-    const g = games.get(b.game_id);
-    if (!g || !g.played) continue;
-    let result = null;
-    if (b.kind === "game") result = gradeGame(b, g);
-    else if (stats) {
-      const s = stats.get(`${b.player_id}|${b.season}|${b.week}`);
-      if (!s) { waiting++; continue; }   // no stat line yet (or the player didn't play)
-      const actual = PM.STATS[b.stat].f(s);
-      result = actual === b.line ? "push" : (actual > b.line) === (b.side === "over") ? "win" : "loss";
-    }
+  for (const b of singles) {
+    const result = grade(b, games, stats);
+    if (result === "waiting") { waiting++; continue; }
     if (!result) continue;
     const { error } = await db().from("bets").update({ result, settled_at: new Date().toISOString() }).eq("id", b.id);
     if (!error) { b.result = result; settled++; }
+  }
+  for (const p of parlays) {
+    let changed = false;
+    for (const l of p.legs.filter(canAutoGrade)) {
+      const result = grade(l, games, stats);
+      if (result === "waiting") { waiting++; continue; }
+      if (!result) continue;
+      const { error } = await db().from("bet_legs").update({ result }).eq("id", l.id);
+      if (!error) { l.result = result; changed = true; }
+    }
+    if (changed && await setParlayFromLegs(p) && p.result !== "pending") settled++;
   }
   return { settled, waiting };
 }
@@ -128,6 +180,17 @@ function renderChart(list) {
 }
 
 // ---- Table ----------------------------------------------------------------------
+const resultSelect = (value, attr) => `<select ${attr} aria-label="Result">${Object.entries(RESULTS).map(([k, v]) =>
+  `<option value="${k}"${k === value ? " selected" : ""}>${v}</option>`).join("")}</select>`;
+
+function legsList(b) {
+  const reduced = payoutOdds(b) !== b.odds;
+  return `<ol class="legs">${b.legs.map(l => `<li data-leg="${l.id}">
+      <span>${T.esc(l.description)} <span class="muted small">${T.fmtOdds(l.odds)}${l.model_prob != null ? ` · model ${pct(l.model_prob)}` : ""}</span></span>
+      ${resultSelect(l.result, "data-leg-result")}</li>`).join("")}</ol>
+    ${reduced && b.result !== "loss" ? `<div class="muted small">Pushed or voided legs drop out: pays at ${T.fmtOdds(payoutOdds(b))}</div>` : ""}`;
+}
+
 function renderList() {
   const kind = $("#f-kind").value, status = $("#f-status").value;
   const list = bets.filter(b => (!kind || b.kind === kind) &&
@@ -136,18 +199,20 @@ function renderList() {
     <th>Model</th><th>Result</th><th>Profit</th><th></th></tr></thead><tbody>${list.map(b => {
       const p = profit(b);
       const model = b.model_prob != null ? `${pct(b.model_prob, 1)}${b.edge != null ? ` · ${b.edge >= 0 ? "+" : ""}${(b.edge * 100).toFixed(1)}%` : ""}` : "–";
+      const auto = b.result === "pending" && (b.kind === "parlay" ? b.legs.some(l => l.game_id) : b.game_id);
       return `<tr data-id="${b.id}">
-        <td>${b.placed_on}</td><td><span class="badge ${b.kind === "prop" ? "PROP" : "ATS"}">${KIND[b.kind]}</span></td>
-        <td class="wrap-cell"><strong>${T.esc(b.description)}</strong>${b.notes ? `<div class="muted small">${T.esc(b.notes)}</div>` : ""}
-          ${b.result === "pending" && b.game_id ? '<div class="muted small">Settles automatically</div>' : ""}</td>
-        <td>${PM.fmtOdds(b.odds)}</td>
+        <td>${b.placed_on}</td><td><span class="badge ${BADGE[b.kind]}">${KIND[b.kind]}</span></td>
+        <td class="wrap-cell"><strong>${T.esc(b.kind === "parlay" ? `${b.legs.length}-leg parlay` : b.description)}</strong>
+          ${b.kind === "parlay" ? legsList(b) : ""}
+          ${b.notes ? `<div class="muted small">${T.esc(b.notes)}</div>` : ""}
+          ${auto ? '<div class="muted small">Settles automatically</div>' : ""}</td>
+        <td><input class="cell-input odds-input" type="number" step="1" value="${b.odds}" data-odds aria-label="Odds"></td>
         <td><input class="cell-input" type="number" min="0" step="1" value="${b.stake.toFixed(2)}" data-stake aria-label="Stake"></td>
         <td class="small">${model}</td>
-        <td><select data-result aria-label="Result">${Object.entries(RESULTS).map(([k, v]) =>
-          `<option value="${k}"${k === b.result ? " selected" : ""}>${v}</option>`).join("")}</select></td>
+        <td>${resultSelect(b.result, "data-result")}</td>
         <td class="${p > 0 ? "pos" : p < 0 ? "neg" : ""}">${b.result === "pending" ? "–" : money(p)}</td>
         <td><button type="button" class="link" data-del>Delete</button></td></tr>`;
-    }).join("") || `<tr><td colspan="9" class="muted">No bets yet. Add one above, or use Track bet on the picks pages.</td></tr>`}</tbody>`;
+    }).join("") || `<tr><td colspan="9" class="muted">No bets yet. Add one above, or use Track on the picks pages.</td></tr>`}</tbody>`;
 }
 
 function renderAll() {
@@ -157,14 +222,14 @@ function renderAll() {
 
 async function updateBet(id, fields) {
   const { error } = await db().from("bets").update(fields).eq("id", id);
-  if (error) { T.toast(`Couldn't save: ${error.message}`, "error"); return false; }
+  if (error) { T.toast(`Couldn't save: ${error.message}`, "error"); renderList(); return false; }
   Object.assign(bets.find(b => b.id === id), fields);
   renderAll();
   T.toast("Saved", "ok");
   return true;
 }
 
-$("#list").addEventListener("change", e => {
+$("#list").addEventListener("change", async e => {
   const id = e.target.closest("tr").dataset.id;
   if (e.target.matches("[data-result]")) {
     const result = e.target.value;
@@ -173,6 +238,19 @@ $("#list").addEventListener("change", e => {
     const stake = Number(e.target.value);
     if (!(stake >= 0)) { T.toast("Stake must be 0 or more", "error"); renderList(); return; }
     updateBet(id, { stake: Math.round(stake * 100) / 100 });
+  } else if (e.target.matches("[data-odds]")) {
+    const odds = Number(e.target.value);
+    if (!oddsOk(odds)) { T.toast("Odds must be like -110 or +150 (at least 100 either way)", "error"); renderList(); return; }
+    updateBet(id, { odds });
+  } else if (e.target.matches("[data-leg-result]")) {
+    const b = bets.find(x => x.id === id), legId = e.target.closest("[data-leg]").dataset.leg;
+    const result = e.target.value;
+    const { error } = await db().from("bet_legs").update({ result }).eq("id", legId);
+    if (error) { T.toast(`Couldn't save: ${error.message}`, "error"); renderList(); return; }
+    b.legs.find(l => l.id === legId).result = result;
+    await setParlayFromLegs(b);
+    renderAll();
+    T.toast("Saved", "ok");
   }
 });
 
@@ -190,7 +268,7 @@ $("#add").addEventListener("submit", async e => {
   e.preventDefault();
   const msg = $("#add-msg");
   const odds = Number($("#a-odds").value), stake = Number($("#a-stake").value);
-  if (!Number.isInteger(odds) || (odds > -100 && odds < 100)) {
+  if (!oddsOk(odds)) {
     msg.textContent = "Odds must be American odds like -110 or +150 (at least 100 either way).";
     msg.className = "auth-msg error";
     return;
@@ -215,8 +293,17 @@ $("#add").addEventListener("submit", async e => {
   }
 });
 
+// "Add as parlay leg" puts the form's bet in the parlay slip instead of saving it.
+$("#a-slip").addEventListener("click", () => {
+  const odds = Number($("#a-odds").value), desc = $("#a-desc").value.trim();
+  if (!desc || !oddsOk(odds)) { T.toast("Enter the bet and its odds first", "error"); return; }
+  window.GridIronSlip.add({ kind: $("#a-kind").value, description: desc, odds });
+  $("#a-desc").value = "";
+});
+
 $("#f-kind").addEventListener("change", renderAll);
 $("#f-status").addEventListener("change", renderList);
+document.addEventListener("gridiron:bets-changed", async () => { await loadBets(); renderAll(); });
 
 // ---- Startup ----------------------------------------------------------------------
 async function refresh() {
@@ -234,7 +321,7 @@ async function refresh() {
     if (settled) {
       renderAll();
       T.toast(`Settled ${settled} bet${settled === 1 ? "" : "s"} from final results`, "ok");
-    }
+    } else renderList();
     $("#status").textContent = `${bets.length} bet${bets.length === 1 ? "" : "s"} tracked.` +
       (settled ? ` Just settled ${settled} from final results.` : "") +
       (waiting ? ` ${waiting} prop${waiting === 1 ? " is" : "s are"} waiting on stat lines (if the player didn't play, mark it Void).` : "") +

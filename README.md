@@ -13,19 +13,20 @@ A static web app that recommends NFL bets (spread, over/under, and optionally mo
 
 ## Pages
 
-- **Game picks** (`index.html`): the game model's spread, total, and moneyline picks. Each pick has a **Track bet** button.
-- **Player props** (`props.html`): projections for every active QB, RB, WR, and TE. A calculator prices any line you get from a sportsbook (win chance, fair odds, edge, quarter-Kelly stake). Saved props are re-priced on every load and ranked as suggestions, and past props are graded against what the model said before kickoff.
-- **My bets** (`bets.html`): every bet you track or add by hand, with record, profit, ROI, and a running-profit chart. Bets tracked from the picks pages settle automatically from final scores and stat lines.
+- **Game picks** (`index.html`): the game model's spread, total, and moneyline picks. Every pick, and every side of every upcoming game, has **Track** and **+ Parlay** buttons.
+- **Player props** (`props.html`): **Top plays** lists what each player will most likely do (median and typical range) and the chance and fair odds of common milestones (50+ rushing yards, 5+ catches, anytime TD), with no sportsbook line needed. **Player outlook** shows every prop for one player next to his recent games, and a **Model report card** shows how last week's and this season's projections held up. A calculator prices any sportsbook line (win chance, fair odds, edge, quarter-Kelly stake). Saved props are re-priced on every load and ranked as suggestions, and past props are graded against what the model said before kickoff.
+- **My bets** (`bets.html`): every bet and parlay you track or add by hand, with record, profit, ROI, and a running-profit chart. Odds, stake, and result can be edited in place. Bets and parlay legs tracked from the picks pages settle automatically from final scores and stat lines.
+- **Parlay slip** (every page, `track.js`): **+ Parlay** adds a leg, and the slip shows combined odds, the model's chance (product of legs, with a warning for same-game legs), edge, and payout. Tracking saves the parlay and its legs in one transaction (`create_parlay`). A parlay loses on any lost leg, and pushed or voided legs drop out of the payout.
 
 ## Player props model
 
-`props-model.js` walks through every week of nflverse weekly player stats in order, like the game model. A projection is a recency-weighted average (last season counts half), nudged for the opponent's defense against that position and the team's implied points. Week by week it learns three corrections for each stat and volume tier: projection bias, spread of outcomes, and a calibration curve for where results land. The projection becomes a gamma, normal, or count distribution, which gives over, under, and push chances for any line.
+`props-model.js` walks through every week of nflverse weekly player stats in order, like the game model. A projection is a recency-weighted average (last season counts half), nudged for the opponent's defense against that position and the team's implied points. Week by week it learns three corrections for each stat and volume tier: projection bias, spread of outcomes, and a calibration curve for where results land. Anytime TD chances are calibrated directly (how often players scored when the model said about p). The projection becomes a gamma, normal, or count distribution, which gives over, under, and push chances for any line.
 
 Walk-forward backtest (2025 to tune, 2026 Weeks 1–6 unseen): projections were about 2–4% more accurate than a player's last-8-game average. Predicted over rates at a line matched actual rates within about 3 points. The Netlify function `netlify/functions/player-stats.mjs` serves this season's and last season's stats (GitHub release files can't be fetched from the browser).
 
 ## Accounts
 
-Sign-in uses email and password through Supabase Auth (project `ISM4421NFLPicks`). The app stays hidden until someone signs in. Each user's settings (`user_settings`), bets (`bets`), and saved props (`props`) are stored in Supabase, and row-level security limits every user to their own rows. The project URL and publishable key are in `config.js`. The table definition is in `supabase/migrations/`.
+Sign-in uses email and password through Supabase Auth (project `ISM4421NFLPicks`). The app stays hidden until someone signs in. Each user's settings (`user_settings`), bets (`bets`, `bet_legs`), and saved props (`props`) are stored in Supabase, and row-level security limits every user to their own rows. The project URL and publishable key are in `config.js`. The table definition is in `supabase/migrations/`.
 
 In the Supabase dashboard under **Authentication → URL Configuration**, **Site URL** and **Redirect URLs** must include `https://gridironedgenfl.netlify.app`, or confirmation and password-reset links won't come back to the app.
 

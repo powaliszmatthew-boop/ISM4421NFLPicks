@@ -62,6 +62,7 @@ function reasons(bet) {
 // A recommended pick as a row for My bets, with what's needed to settle it automatically.
 function trackedBet(b, stake) {
   const g = b.pred.game;
+  if (stake == null) stake = b.ev > 0 ? settings().bankroll * Math.min(MAX_STAKE, b.kelly / 4) : window.GridIronTrack.defaultStake();
   let line = null;
   if (b.market === "ATS") line = b.side === "home" ? -g.spread : g.spread;
   if (b.market === "TOT") line = g.totalLine;
@@ -108,8 +109,7 @@ function renderPicks() {
       </dl>
       <ul class="why">${reasons(b).map(r => `<li>${r}</li>`).join("")}</ul>
       ${publicLine(b)}
-      <button type="button" class="track-btn">Track bet</button>`;
-    card.querySelector(".track-btn").addEventListener("click", e => window.GridIronTrack.trackButton(e.target, trackedBet(b, stake)));
+      <div class="card-actions">${window.GridIronTrack.actions(trackedBet(b, stake), { track: "Track bet" })}</div>`;
     box.appendChild(card);
   }
 }
@@ -196,6 +196,16 @@ async function loadSplits() {
   if (state) renderPicks();
 }
 
+// Every side of a game with the model's chance and edge, each with Track and + Parlay.
+function sideMenu(p) {
+  const opts = M.betOptions(p);
+  if (!opts.length) return "–";
+  return `<details class="side-menu"><summary>Track a side</summary><ul>${opts.map(o => `<li>
+      <span><strong>${o.label}</strong> ${M.fmtOdds(o.american)}
+        <span class="muted small">model ${pct(o.prob, 1)} · <span class="${o.ev >= 0 ? "pos" : "neg"}">${signed(o.ev * 100)}%</span></span></span>
+      ${window.GridIronTrack.actions(() => trackedBet(o))}</li>`).join("")}</ul></details>`;
+}
+
 function renderGames() {
   const rows = state.upcoming.map(p => {
     const g = p.game;
@@ -207,11 +217,12 @@ function renderGames() {
       <td>${pct(p.pHomeCover)}</td>
       <td>${g.totalLine ?? "–"}</td>
       <td>${pct(p.pOver)}</td>
+      <td>${sideMenu(p)}</td>
     </tr>`;
   }).join("");
   $("#games").innerHTML = `<thead><tr><th>Week</th><th>Game</th><th>Spread</th><th>Home win</th>
-    <th>Home covers</th><th>Total</th><th>Over</th></tr></thead><tbody>${rows ||
-    '<tr><td colspan="7" class="muted">No upcoming lines posted.</td></tr>'}</tbody>`;
+    <th>Home covers</th><th>Total</th><th>Over</th><th>Bet</th></tr></thead><tbody>${rows ||
+    '<tr><td colspan="8" class="muted">No upcoming lines posted.</td></tr>'}</tbody>`;
 }
 
 function renderRecord() {

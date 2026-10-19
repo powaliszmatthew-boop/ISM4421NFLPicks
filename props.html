@@ -16,10 +16,13 @@
       <a href="bets.html">My bets</a>
     </nav>
     <nav class="nav" aria-label="On this page">
+      <a href="#plays-h">Top plays</a>
+      <a href="#outlook-h">Player outlook</a>
       <a href="#mine-h">My props &amp; suggestions</a>
       <a href="#calc-h">Price a prop</a>
       <a href="#proj-h">This week's projections</a>
       <a href="#past-h">Past props</a>
+      <a href="#report-h">Model report card</a>
       <a href="#how-h" class="key-link">How it works</a>
     </nav>
   </header>
@@ -38,6 +41,29 @@
       </label>
       <p class="explain wide">Same settings as the game picks page. A prop is suggested when the model's edge on one side is at least the minimum. Stakes use quarter-Kelly, capped at 3% of bankroll.</p>
       <p id="save-state" class="muted small save-state" role="status"></p>
+    </section>
+
+    <section class="card" aria-labelledby="plays-h">
+      <div class="row-head">
+        <h2 id="plays-h">Top plays this week</h2>
+        <div class="filters">
+          <label class="inline">Prop <select id="t-stat"></select></label>
+          <label class="inline">Position <select id="t-pos"><option value="">All</option><option>QB</option><option>RB</option><option>WR</option><option>TE</option></select></label>
+        </div>
+      </div>
+      <p class="explain">What the model expects from each player, learned from every previous week. <strong>Most likely</strong> is the middle outcome (half the time it goes higher, half lower), and <strong>typical range</strong> covers the middle half of outcomes. Each milestone shows the model's chance and its <strong>fair odds</strong>: the price where the bet breaks even. It's only a good bet if your sportsbook pays better than that, for example fair +120 and your book offers +140. <strong>Track</strong> records it at the fair odds; change the odds in My bets to match what you got.</p>
+      <div id="plays" class="plays"></div>
+      <button id="t-more" type="button" class="link" hidden>Show more</button>
+    </section>
+
+    <section class="card" aria-labelledby="outlook-h">
+      <div class="row-head">
+        <h2 id="outlook-h">Player outlook</h2>
+        <label class="inline">Player <input id="o-search" list="o-players" type="search" placeholder="Type a name"></label>
+        <datalist id="o-players"></datalist>
+      </div>
+      <p class="explain">Everything the model expects from one player this week, next to his recent games.</p>
+      <div id="outlook"></div>
     </section>
 
     <section class="card" aria-labelledby="mine-h">
@@ -81,6 +107,12 @@
       <p class="explain">Props you saved for earlier weeks, with the result and whether the model's side won.</p>
       <div id="past-sum" class="tiles"></div>
       <div class="scroll"><table id="past" class="table"></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="report-h">
+      <h2 id="report-h">Model report card</h2>
+      <p class="explain">How the model's projections held up in the most recent completed week and this season so far. Every projection was made before that week's games, then the model learned from the results. If it's working, about half of results land inside the typical range, and milestone chances match how often they hit.</p>
+      <div id="report"></div>
     </section>
 
     <section class="card" aria-labelledby="how-h">
