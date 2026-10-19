@@ -276,7 +276,7 @@ button:hover { border-color: var(--accent); }
 .odds-input { width: 80px; }
 
 /* Parlay slip */
-.slip { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100vw - 32px); }
+.slip { position: fixed; left: 16px; bottom: 16px; z-index: 20; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100vw - 32px); }
 .slip-toggle {
   border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 700; cursor: pointer;
   background: var(--navy); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.25);
