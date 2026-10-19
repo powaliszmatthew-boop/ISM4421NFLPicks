@@ -10,6 +10,14 @@
   <header class="topbar">
     <h1>GridIron Edge</h1>
     <p class="tagline">NFL picks from week-to-week statistics and a model that keeps learning</p>
+    <nav class="nav">
+      <a href="#picks-h">Picks</a>
+      <a href="#money-h">Where the money is</a>
+      <a href="#games-h">All games</a>
+      <a href="#record-h">Track record</a>
+      <a href="#power-h">Rankings</a>
+      <a href="#key-h" class="key-link">Key: what everything means</a>
+    </nav>
   </header>
 
   <main class="wrap">
@@ -30,16 +38,29 @@
         <span>Bankroll ($)</span>
         <input id="bankroll" type="number" min="0" step="50" value="500">
       </label>
+      <p class="explain wide">These settings control which bets are recommended below. A higher <strong>minimum edge</strong> gives fewer, stronger picks. <strong>Markets</strong> picks the bet types to consider. <strong>Bankroll</strong> is the total you set aside for betting; it's used to size each suggested stake.</p>
     </section>
 
     <section class="card" aria-labelledby="picks-h">
       <h2 id="picks-h">Recommended bets</h2>
+      <p class="explain">Bets where the model thinks the chance of winning is higher than the odds imply. The green bar is the model's win chance, and the black tick is the break-even point. The bigger the gap, the bigger the edge. When live data is available, each card also shows how the public is betting that side.</p>
       <p id="picks-sub" class="muted"></p>
       <div id="picks" class="picks"></div>
     </section>
 
+    <section class="card" aria-labelledby="money-h">
+      <div class="row-head">
+        <h2 id="money-h">Where the money is (live)</h2>
+        <button id="refresh-splits" type="button">Refresh</button>
+      </div>
+      <p class="explain">Live betting splits from DraftKings Sportsbook for each game. <strong>Money</strong> is the share of all dollars wagered on each side, also called the handle. <strong>Bets</strong> is the share of tickets, counting each wager once no matter its size. When a side has much more of the money than the bets, fewer people are making bigger bets on it. Bettors call that a "sharp" sign. Sportsbooks don't publish dollar totals, only these percentages.</p>
+      <p id="splits-sub" class="muted"></p>
+      <div id="splits" class="splits"></div>
+    </section>
+
     <section class="card" aria-labelledby="games-h">
       <h2 id="games-h">Every upcoming game</h2>
+      <p class="explain">The model's probabilities for every game with posted odds, from the home team's point of view. "mkt" is the win chance implied by the betting odds, with the bookmaker's fee removed. A model number far from "mkt" means the model disagrees with the market.</p>
       <div class="scroll"><table id="games" class="table"></table></div>
     </section>
 
@@ -48,7 +69,7 @@
         <h2 id="record-h">Track record</h2>
         <label class="inline">Season <select id="season"></select></label>
       </div>
-      <p class="muted">Each week's picks were made using only games played before that week, then the model learned from the results. Same settings as above.</p>
+      <p class="explain">How the model's picks would have done in past weeks, using your current settings. Each week's picks were made using only games played before that week, then the model learned from the results. That makes this an honest test. Results are in <strong>units</strong>, where 1 unit = one standard bet.</p>
       <div id="tiles" class="tiles"></div>
       <div id="chart" class="chart"></div>
       <div class="scroll"><table id="weekly" class="table"></table></div>
@@ -56,16 +77,61 @@
 
     <section class="card" aria-labelledby="power-h">
       <h2 id="power-h">Power rankings</h2>
+      <p class="explain">Teams ranked by Elo rating, the model's measure of team strength, as of the latest results. Points for and against are recent averages that weight the latest games most. "ATS form" shows how many points a team has recently beaten (+) or missed (−) the spread by.</p>
       <div class="scroll"><table id="power" class="table"></table></div>
     </section>
 
-    <section class="card" aria-labelledby="how-h">
-      <h2 id="how-h">How it works</h2>
+    <section class="card" aria-labelledby="key-h">
+      <h2 id="key-h">Key: what everything means</h2>
+
+      <h3>Sections of the app</h3>
+      <dl class="key">
+        <dt>Settings bar</dt><dd>Choose how picky the app is (minimum edge), which bet types to consider, and your bankroll for stake sizing.</dd>
+        <dt>Recommended bets</dt><dd>The model's value bets for upcoming games, best first. Each card shows the bet, the odds, the model's win chance, the edge, a suggested stake, the reasons behind it, and how the public is betting that side.</dd>
+        <dt>Where the money is</dt><dd>Live DraftKings splits for every upcoming game. It shows the percentage of money and the percentage of bets on each side of the moneyline, spread, and total.</dd>
+        <dt>Every upcoming game</dt><dd>The model's raw probabilities for every game, including games with no recommended bet.</dd>
+        <dt>Track record</dt><dd>A week-by-week backtest of past picks with your current settings, so you can see whether the picks have actually made money.</dd>
+        <dt>Power rankings</dt><dd>Every team's current strength rating and recent form, which feed into the model.</dd>
+        <dt>Current model weights</dt><dd>What the model has learned so far: how much each statistic pushes a prediction up (+) or down (−).</dd>
+      </dl>
+
+      <h3>Betting terms</h3>
+      <dl class="key">
+        <dt>Moneyline (ML)</dt><dd>Bet on which team wins the game outright.</dd>
+        <dt>Spread (ATS)</dt><dd>Bet on the margin of victory. "SF −7.5" means SF must win by 8 or more. "WAS +7.5" wins if WAS wins or loses by 7 or fewer. ATS means "against the spread."</dd>
+        <dt>Over/Under (total)</dt><dd>Bet on whether both teams' combined points go over or under the posted number.</dd>
+        <dt>Odds (−110, +150)</dt><dd>American odds. A negative number is how much you risk to win $100 (−110: risk $110 to win $100). A positive number is how much you win on a $100 bet (+150: win $150).</dd>
+        <dt>Favorite / underdog</dt><dd>The favorite is expected to win (negative moneyline or minus spread). The underdog is expected to lose (positive moneyline or plus spread).</dd>
+        <dt>Money % (handle)</dt><dd>Share of all dollars bet on that side at DraftKings. 80% means $80 of every $100 wagered on that market is on that side.</dd>
+        <dt>Bets % (tickets)</dt><dd>Share of the number of bets on that side, where a $5 bet and a $5,000 bet each count once.</dd>
+        <dt>Sharp money sign</dt><dd>A side's money % is at least 15 points higher than its bets %. Fewer but larger bets are coming in on that side, which often means experienced bettors. It's a clue, not a guarantee.</dd>
+        <dt>Public side</dt><dd>70% or more of the bets are on one side. Casual bettors tend to back favorites and overs.</dd>
+        <dt>Push</dt><dd>The result lands exactly on the line, for example a 3-point win against a 3-point spread. Your stake is refunded.</dd>
+      </dl>
+
+      <h3>Model and results terms</h3>
+      <dl class="key">
+        <dt>Win chance</dt><dd>The model's estimated probability that the bet wins.</dd>
+        <dt>Break-even</dt><dd>The win rate needed to not lose money at those odds. At −110 it's 52.4%.</dd>
+        <dt>Edge (EV)</dt><dd>Expected value: the average profit per $1 bet if the model's win chance is correct. +4% means about $4 profit per $100 over many bets. Negative means a losing bet on average.</dd>
+        <dt>Minimum edge</dt><dd>Only bets with at least this much edge are recommended.</dd>
+        <dt>Suggested stake</dt><dd>How much of your bankroll to bet, using a quarter of the Kelly formula and capped at 3%. It bets more when the edge is bigger, while limiting losing streaks.</dd>
+        <dt>Elo</dt><dd>A team strength rating. Average is about 1500, and 25 Elo points is worth about 1 point on the scoreboard. It rises after wins, especially big wins over strong teams.</dd>
+        <dt>Point-diff form</dt><dd>Recent points scored minus points allowed, weighted toward the latest games.</dd>
+        <dt>ATS form / over-under form</dt><dd>How much a team has recently beaten the spread, or how far its games have gone over the total.</dd>
+        <dt>Units</dt><dd>Profit measured in standard bet sizes. +2.5 units at $10 a bet is $25 profit.</dd>
+        <dt>W-L-P</dt><dd>Wins, losses, and pushes.</dd>
+        <dt>Hit rate</dt><dd>Wins ÷ (wins + losses). At standard −110 odds you need 52.4% to profit.</dd>
+        <dt>ROI</dt><dd>Return on investment: profit ÷ total amount bet.</dd>
+        <dt>Winner picked (model / market)</dt><dd>How often the model's favorite won, compared with how often the betting favorite won.</dd>
+      </dl>
+
+      <h3>How it works</h3>
       <ol class="how">
-        <li><strong>Data.</strong> Every NFL game since 1999 with final scores and closing moneylines, spreads and totals, from the open <a href="https://github.com/nflverse/nfldata" target="_blank" rel="noopener">nflverse</a> dataset (updated during the season). It's downloaded fresh each time the page loads.</li>
+        <li><strong>Data.</strong> Every NFL game since 1999 with final scores and closing moneylines, spreads and totals, from the open <a href="https://github.com/nflverse/nfldata" target="_blank" rel="noopener">nflverse</a> dataset (updated during the season). It's downloaded fresh each time the page loads. Live money and bet percentages come from the <a href="https://dknetwork.draftkings.com/draftkings-sportsbook-betting-splits/" target="_blank" rel="noopener">DraftKings betting splits</a> page and are refreshed every 5 minutes.</li>
         <li><strong>Team stats.</strong> For each team it tracks an Elo rating (adjusted for margin of victory), rolling points scored/allowed, how often they beat the spread, and how often their games go over the total. Recent games count most.</li>
         <li><strong>Learning week to week.</strong> Three logistic-regression models (win, cover, over) are trained online. Week by week, they predict that week's games, see the results, and update their weights. Then they move on to the next week. When new results are posted, the next page load learns from them.</li>
-        <li><strong>Finding value.</strong> The model's probability is compared with the probability implied by the odds. A bet is only recommended when its expected value is above your minimum edge. Suggested stakes use quarter-Kelly, capped at 3% of bankroll.</li>
+        <li><strong>Finding value.</strong> The model's probability is compared with the probability implied by the odds. A bet is only recommended when its expected value is above your minimum edge.</li>
       </ol>
       <h3>Current model weights</h3>
       <div id="weights" class="weights"></div>

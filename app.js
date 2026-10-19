@@ -4,8 +4,14 @@ const pct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
 const signed = (x, d = 1) => (x > 0 ? "+" : "") + x.toFixed(d);
 const MARKET_NAMES = { ML: "Moneyline", ATS: "Spread", TOT: "Over/Under" };
 const MAX_STAKE = 0.03;
+const SPLITS_URL = "/.netlify/functions/splits";
+const SPLITS_REFRESH_MS = 5 * 60 * 1000;
+const SHARP_GAP = 15;     // money % this many points above bets % = sharp sign
+const PUBLIC_PCT = 70;    // this share of bets or more = public side
+const SPLIT_KEY = { ML: "ml", ATS: "spread", TOT: "total" };
 
 let state = null;
+let splits = { status: "loading" };
 
 function settings() {
   return {
@@ -23,6 +29,17 @@ function kickoff(g) {
 
 function weekLabel(g) {
   return g.type === "REG" ? `Week ${g.week}` : { WC: "Wild Card", DIV: "Divisional", CON: "Conference", SB: "Super Bowl" }[g.type];
+}
+
+// Live DraftKings split for a game, matched by teams.
+function findSplit(g) {
+  if (splits.status !== "ok") return null;
+  return splits.games.find(s => s.home === g.home && s.away === g.away) || null;
+}
+
+function splitForBet(b) {
+  const s = findSplit(b.pred.game);
+  return s && s[SPLIT_KEY[b.market]] ? s[SPLIT_KEY[b.market]][b.side] || null : null;
 }
 
 // Plain-language reasons behind a pick.
@@ -76,9 +93,92 @@ function renderPicks() {
         <div><dt>Edge (EV)</dt><dd class="pos">${signed(b.ev * 100)}%</dd></div>
         <div><dt>Suggested stake</dt><dd>$${stake.toFixed(2)}</dd></div>
       </dl>
-      <ul class="why">${reasons(b).map(r => `<li>${r}</li>`).join("")}</ul>`;
+      <ul class="why">${reasons(b).map(r => `<li>${r}</li>`).join("")}</ul>
+      ${publicLine(b)}`;
     box.appendChild(card);
   }
+}
+
+function publicLine(b) {
+  const sp = splitForBet(b);
+  if (!sp || sp.handle == null) return "";
+  const gap = sp.handle - sp.bets;
+  const note = gap >= SHARP_GAP ? " · sharp money sign" : sp.bets >= PUBLIC_PCT ? " · public side" : "";
+  return `<p class="public-line"><strong>Live:</strong> ${sp.handle}% of the money and ${sp.bets}% of bets are on this side${note}</p>`;
+}
+
+// One market (moneyline, spread or total) of a game's live splits.
+function marketBlock(title, sides, recommended) {
+  if (!sides.every(x => x.data && x.data.handle != null)) return "";
+  const bar = kind => `<div class="bar" role="img" aria-label="${kind}: ${sides.map(x => `${x.label} ${x.data[kind === "Money" ? "handle" : "bets"]}%`).join(", ")}">
+      ${sides.map((x, i) => `<div class="seg s${i}" style="width:${x.data[kind === "Money" ? "handle" : "bets"]}%"></div>`).join("")}
+    </div>`;
+  const signals = [];
+  for (const x of sides) {
+    if (x.data.handle - x.data.bets >= SHARP_GAP) signals.push(`<span class="chip sharp">Sharp sign: ${x.label}</span>`);
+    else if (x.data.bets >= PUBLIC_PCT) signals.push(`<span class="chip public">Public side: ${x.label}</span>`);
+    if (recommended.includes(x.side)) signals.push(`<span class="chip model">Model pick: ${x.label}</span>`);
+  }
+  return `<div class="mkt">
+    <div class="mkt-title">${title}</div>
+    <div class="mkt-sides">${sides.map((x, i) => `<div class="side s${i}"><span class="dot"></span><strong>${x.label}</strong>
+      <span class="muted small">${x.data.odds != null ? M.fmtOdds(x.data.odds) : ""}</span>
+      <div class="small">Money <strong>${x.data.handle}%</strong> · Bets <strong>${x.data.bets}%</strong></div></div>`).join("")}</div>
+    <div class="bar-row"><span class="bar-kind">Money</span>${bar("Money")}</div>
+    <div class="bar-row"><span class="bar-kind">Bets</span>${bar("Bets")}</div>
+    ${signals.length ? `<div class="chips">${signals.join("")}</div>` : ""}
+  </div>`;
+}
+
+function renderSplits() {
+  const box = $("#splits");
+  if (splits.status === "loading") { $("#splits-sub").textContent = "Loading live betting splits…"; box.innerHTML = ""; return; }
+  if (splits.status === "error") {
+    $("#splits-sub").textContent = `Live betting splits are unavailable right now (${splits.error}). They load when the site runs on Netlify; opening index.html directly can't reach them.`;
+    box.innerHTML = "";
+    return;
+  }
+  const order = new Map(state ? state.upcoming.map((p, i) => [`${p.game.away}@${p.game.home}`, p]) : []);
+  const recs = state ? M.selectBets(state.upcoming, settings()) : [];
+  const games = splits.games.slice().sort((a, b) => {
+    const ia = [...order.keys()].indexOf(`${a.away}@${a.home}`), ib = [...order.keys()].indexOf(`${b.away}@${b.home}`);
+    return (ia < 0 ? 1e3 : ia) - (ib < 0 ? 1e3 : ib);
+  });
+  const updated = new Date(splits.fetchedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const missing = state ? state.upcoming.filter(p => !findSplit(p.game)).map(p => `${p.game.away} @ ${p.game.home}`) : [];
+  $("#splits-sub").textContent = `${games.length} games from ${splits.source}, updated ${updated}.` +
+    (missing.length ? ` Not posted yet: ${missing.join(", ")}.` : "");
+  box.innerHTML = games.map(s => {
+    const pred = order.get(`${s.away}@${s.home}`);
+    const when = pred ? `${weekLabel(pred.game)} · ${kickoff(pred.game)}` : s.time;
+    const recSides = m => recs.filter(b => b.pred === pred && b.market === m).map(b => b.side);
+    const line = x => (x && x.line != null ? M.fmtLine(x.line) : "");
+    return `<article class="split-card">
+      <div class="pick-top"><h3>${s.away} @ ${s.home}</h3><span class="muted">${when}</span></div>
+      ${marketBlock("Moneyline (who wins)", [
+        { side: "away", label: s.away, data: s.ml && s.ml.away },
+        { side: "home", label: s.home, data: s.ml && s.ml.home }], recSides("ML"))}
+      ${marketBlock("Spread", [
+        { side: "away", label: `${s.away} ${line(s.spread && s.spread.away)}`, data: s.spread && s.spread.away },
+        { side: "home", label: `${s.home} ${line(s.spread && s.spread.home)}`, data: s.spread && s.spread.home }], recSides("ATS"))}
+      ${marketBlock("Over/Under", [
+        { side: "over", label: `Over ${s.total && s.total.over ? s.total.over.line : ""}`, data: s.total && s.total.over },
+        { side: "under", label: `Under ${s.total && s.total.under ? s.total.under.line : ""}`, data: s.total && s.total.under }], recSides("TOT"))}
+    </article>`;
+  }).join("") || '<p class="muted">DraftKings has no NFL splits posted for the next 7 days.</p>';
+}
+
+async function loadSplits() {
+  try {
+    const res = await fetch(SPLITS_URL, { cache: "no-store" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(body.games)) throw new Error(body.error || `HTTP ${res.status}`);
+    splits = { status: "ok", ...body };
+  } catch (err) {
+    splits = { status: "error", error: err.message };
+  }
+  renderSplits();
+  if (state) renderPicks();
 }
 
 function renderGames() {
@@ -177,9 +277,17 @@ function renderAll() {
   $("#edge-out").textContent = `${$("#edge").value}%`;
   renderPicks();
   renderRecord();
+  renderSplits();
 }
 
 async function init() {
+  loadSplits();
+  setInterval(loadSplits, SPLITS_REFRESH_MS);
+  $("#refresh-splits").addEventListener("click", () => {
+    splits = { status: "loading" };
+    renderSplits();
+    loadSplits();
+  });
   try {
     const games = await M.load();
     const { predictions, teams, models } = M.run(games);

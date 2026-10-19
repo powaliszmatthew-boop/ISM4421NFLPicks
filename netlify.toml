@@ -1,0 +1,4 @@
+# Static site at the repo root plus one function for live betting splits.
+[build]
+  publish = "."
+  functions = "netlify/functions"
