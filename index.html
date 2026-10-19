@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GridIron Edge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>GridIron Edge</h1>
+    <p class="tagline">NFL picks from week-to-week statistics and a model that keeps learning</p>
+  </header>
+
+  <main class="wrap">
+    <p id="status" class="status" role="status">Loading NFL results and betting lines…</p>
+
+    <section class="controls" aria-label="Pick settings">
+      <label>
+        <span>Minimum edge (expected value): <strong id="edge-out">3%</strong></span>
+        <input id="edge" type="range" min="0" max="12" step="1" value="3">
+      </label>
+      <fieldset class="markets">
+        <legend>Markets</legend>
+        <label><input type="checkbox" value="ATS" checked> Spread</label>
+        <label><input type="checkbox" value="TOT" checked> Over/Under</label>
+        <label><input type="checkbox" value="ML"> Moneyline</label>
+      </fieldset>
+      <label>
+        <span>Bankroll ($)</span>
+        <input id="bankroll" type="number" min="0" step="50" value="500">
+      </label>
+    </section>
+
+    <section class="card" aria-labelledby="picks-h">
+      <h2 id="picks-h">Recommended bets</h2>
+      <p id="picks-sub" class="muted"></p>
+      <div id="picks" class="picks"></div>
+    </section>
+
+    <section class="card" aria-labelledby="games-h">
+      <h2 id="games-h">Every upcoming game</h2>
+      <div class="scroll"><table id="games" class="table"></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="record-h">
+      <div class="row-head">
+        <h2 id="record-h">Track record</h2>
+        <label class="inline">Season <select id="season"></select></label>
+      </div>
+      <p class="muted">Each week's picks were made using only games played before that week, then the model learned from the results. Same settings as above.</p>
+      <div id="tiles" class="tiles"></div>
+      <div id="chart" class="chart"></div>
+      <div class="scroll"><table id="weekly" class="table"></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="power-h">
+      <h2 id="power-h">Power rankings</h2>
+      <div class="scroll"><table id="power" class="table"></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="how-h">
+      <h2 id="how-h">How it works</h2>
+      <ol class="how">
+        <li><strong>Data.</strong> Every NFL game since 1999 with final scores and closing moneylines, spreads and totals, from the open <a href="https://github.com/nflverse/nfldata" target="_blank" rel="noopener">nflverse</a> dataset (updated during the season). It's downloaded fresh each time the page loads.</li>
+        <li><strong>Team stats.</strong> For each team it tracks an Elo rating (adjusted for margin of victory), rolling points scored/allowed, how often they beat the spread, and how often their games go over the total. Recent games count most.</li>
+        <li><strong>Learning week to week.</strong> Three logistic-regression models (win, cover, over) are trained online. Week by week, they predict that week's games, see the results, and update their weights. Then they move on to the next week. When new results are posted, the next page load learns from them.</li>
+        <li><strong>Finding value.</strong> The model's probability is compared with the probability implied by the odds. A bet is only recommended when its expected value is above your minimum edge. Suggested stakes use quarter-Kelly, capped at 3% of bankroll.</li>
+      </ol>
+      <h3>Current model weights</h3>
+      <div id="weights" class="weights"></div>
+      <p class="disclaimer">For education and entertainment. Closing NFL lines are very efficient, and no model reliably beats them. Check the track record above before trusting any pick. Never bet more than you can afford to lose. Need help? Call 1-800-GAMBLER.</p>
+    </section>
+  </main>
+
+  <script src="model.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
