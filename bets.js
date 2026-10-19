@@ -38,7 +38,8 @@ function profit(b) {
 const num = v => (v == null ? null : Number(v));
 
 async function loadBets() {
-  const { data, error } = await db().from("bets").select("*, bet_legs(*)")
+  // The college football site shares this database; its bets are tagged sport = 'cfb'.
+  const { data, error } = await db().from("bets").select("*, bet_legs(*)").eq("sport", "nfl")
     .order("placed_on", { ascending: false }).order("created_at", { ascending: false });
   if (error) throw error;
   bets = data.map(b => ({
