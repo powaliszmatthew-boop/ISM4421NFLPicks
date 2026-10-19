@@ -315,4 +315,11 @@ async function init() {
   }
 }
 
-init();
+// auth.js calls start() once someone signs in; later sign-ins just re-render with their settings.
+let started = false;
+window.GridIron = {
+  start() {
+    if (!started) { started = true; init(); }
+    else if (state) renderAll();
+  },
+};

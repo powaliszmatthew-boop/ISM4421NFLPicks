@@ -18,9 +18,30 @@
       <a href="#power-h">Rankings</a>
       <a href="#key-h" class="key-link">Key: what everything means</a>
     </nav>
+    <div id="account" class="account" hidden>
+      <span id="user-email"></span>
+      <button id="signout" type="button">Sign out</button>
+    </div>
   </header>
 
-  <main class="wrap">
+  <section id="auth" class="auth wrap" aria-labelledby="auth-title" hidden>
+    <form id="auth-form" class="card auth-card">
+      <h2 id="auth-title">Sign in</h2>
+      <label id="auth-email-row">
+        <span>Email</span>
+        <input id="auth-email" type="email" autocomplete="email" required>
+      </label>
+      <label id="auth-password-row">
+        <span>Password</span>
+        <input id="auth-password" type="password" minlength="6" autocomplete="current-password" required>
+      </label>
+      <button id="auth-submit" type="submit" class="primary">Sign in</button>
+      <p id="auth-msg" class="auth-msg" role="status"></p>
+      <div id="auth-links" class="auth-links"></div>
+    </form>
+  </section>
+
+  <main class="wrap" hidden>
     <p id="status" class="status" role="status">Loading NFL results and betting lines…</p>
 
     <section class="controls" aria-label="Pick settings">
@@ -39,6 +60,7 @@
         <input id="bankroll" type="number" min="0" step="50" value="500">
       </label>
       <p class="explain wide">These settings control which bets are recommended below. A higher <strong>minimum edge</strong> gives fewer, stronger picks. <strong>Markets</strong> picks the bet types to consider. <strong>Bankroll</strong> is the total you set aside for betting; it's used to size each suggested stake.</p>
+      <p id="save-state" class="muted small save-state" role="status"></p>
     </section>
 
     <section class="card" aria-labelledby="picks-h">
@@ -139,7 +161,10 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
   <script src="model.js"></script>
   <script src="app.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>
