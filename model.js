@@ -245,16 +245,83 @@
     return { predictions, teams, models };
   }
 
+  // ---- Pricing other sportsbooks' lines -----------------------------------------
+  // Final margins vary by about 13.0 points around the closing spread, totals by about
+  // 13.2 around the closing total (2010 onward). The cover and over chances at the
+  // consensus line become an expected margin and total, which price any book's line.
+  const MARGIN_SD = 13.0, TOTAL_SD = 13.2;
+
+  function normInv(p) {
+    p = clamp(p, 1e-6, 1 - 1e-6);
+    const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+    const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+    const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+    const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+    const q = p < 0.02425 ? Math.sqrt(-2 * Math.log(p)) : p > 1 - 0.02425 ? Math.sqrt(-2 * Math.log(1 - p)) : null;
+    if (q !== null) {
+      const x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+      return p < 0.5 ? x : -x;
+    }
+    const r = p - 0.5, s = r * r;
+    return (((((a[0] * s + a[1]) * s + a[2]) * s + a[3]) * s + a[4]) * s + a[5]) * r /
+      (((((b[0] * s + b[1]) * s + b[2]) * s + b[3]) * s + b[4]) * s + 1);
+  }
+
+  // Chance a whole-number result lands over / exactly on / under `line`.
+  function lineProbs(mean, sd, line) {
+    if (Number.isInteger(line)) {
+      const lo = normCdf((line - 0.5 - mean) / sd), hi = normCdf((line + 0.5 - mean) / sd);
+      return { over: 1 - hi, push: hi - lo, under: lo };
+    }
+    const under = normCdf((line - mean) / sd);
+    return { over: 1 - under, push: 0, under };
+  }
+
+  function expected(p) {
+    const g = p.game;
+    return {
+      marginMean: g.spread != null ? g.spread + MARGIN_SD * normInv(p.pHomeCover) : p.f.eloMargin,
+      totalMean: g.totalLine != null ? g.totalLine + TOTAL_SD * normInv(p.pOver) : p.f.formTotal,
+    };
+  }
+
   // ---- Bets ----------------------------------------------------------------
   // Every bettable side of a game with the model probability and expected value.
+  // With sportsbook lines attached (g.books), every side at every book; otherwise the game's own line.
   function betOptions(p) {
     const g = p.game, out = [];
+    if (g.books && Object.keys(g.books).length) {
+      const { marginMean, totalMean } = expected(p);
+      const push = (market, side, label, prob, tie, american, book, line) => {
+        if (american == null) return;
+        const dec = decimalOdds(american), ev = prob * (dec - 1) - (1 - prob - tie);
+        out.push({ pred: p, market, side, label, prob, push: tie, american, book, line,
+                   breakeven: (1 - tie) / dec, ev, kelly: ev > 0 ? ev / (dec - 1) : 0 });
+      };
+      for (const [book, b] of Object.entries(g.books)) {
+        if (b.homeML != null && b.awayML != null) {
+          push("ML", "home", `${g.home} ML`, p.pHomeWin, 0, b.homeML, book, null);
+          push("ML", "away", `${g.away} ML`, 1 - p.pHomeWin, 0, b.awayML, book, null);
+        }
+        if (b.homeSpread != null) {
+          const pr = lineProbs(marginMean, MARGIN_SD, -b.homeSpread);
+          push("ATS", "home", `${g.home} ${fmtLine(b.homeSpread)}`, pr.over, pr.push, b.homeSpreadOdds ?? -110, book, b.homeSpread);
+          push("ATS", "away", `${g.away} ${fmtLine(-b.homeSpread)}`, pr.under, pr.push, b.awaySpreadOdds ?? -110, book, -b.homeSpread);
+        }
+        if (b.total != null) {
+          const pr = lineProbs(totalMean, TOTAL_SD, b.total);
+          push("TOT", "over", `Over ${b.total}`, pr.over, pr.push, b.overOdds ?? -110, book, b.total);
+          push("TOT", "under", `Under ${b.total}`, pr.under, pr.push, b.underOdds ?? -110, book, b.total);
+        }
+      }
+      return out;
+    }
     const add = (market, side, label, prob, american) => {
       if (american == null) return;
       const dec = decimalOdds(american);
       const ev = prob * dec - 1;
       const kelly = ev > 0 ? ev / (dec - 1) : 0;
-      out.push({ pred: p, market, side, label, prob, american, breakeven: 1 / dec, ev, kelly });
+      out.push({ pred: p, market, side, label, prob, american, breakeven: 1 / dec, ev, kelly, book: null });
     };
     if (g.homeML != null && g.awayML != null) {
       add("ML", "home", `${g.home} ML`, p.pHomeWin, g.homeML);
@@ -351,7 +418,7 @@
   }
 
   const api = { DATA_URL, MODELS, parseCSV, toGames, run, betOptions, selectBets, grade, profit,
-                summarize, winModelMetrics, load, fmtLine, fmtOdds, impliedProb, decimalOdds };
+                summarize, winModelMetrics, load, fmtLine, fmtOdds, impliedProb, decimalOdds, expected };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.NFLModel = api;
 })(typeof window !== "undefined" ? window : globalThis);

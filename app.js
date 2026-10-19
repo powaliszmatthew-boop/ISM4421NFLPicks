@@ -10,8 +10,28 @@ const SHARP_GAP = 15;     // money % this many points above bets % = sharp sign
 const PUBLIC_PCT = 70;    // this share of bets or more = public side
 const SPLIT_KEY = { ML: "ml", ATS: "spread", TOT: "total" };
 
+const BOOKS_REFRESH_MS = 15 * 60 * 1000;
+const BOOK_NAMES = {
+  draftkings: "DraftKings", hardrockbet: "Hard Rock Bet", hardrockbet_fl: "Hard Rock Bet (FL)", fanduel: "FanDuel",
+  betmgm: "BetMGM", williamhill_us: "Caesars", espnbet: "theScore Bet", fanatics: "Fanatics", betrivers: "BetRivers",
+  bovada: "Bovada",
+};
+const bookName = k => (k ? BOOK_NAMES[k] || k : "Market line");
+// The Odds API uses full team names; the game data uses nflverse abbreviations.
+const TEAM_ABBR = {
+  "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
+  "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE",
+  "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB",
+  "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC",
+  "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LA", "Miami Dolphins": "MIA",
+  "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG",
+  "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF",
+  "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS",
+};
+
 let state = null;
 let splits = { status: "loading" };
+let books = { status: "loading" };
 
 function settings() {
   return {
@@ -55,7 +75,7 @@ function reasons(bet) {
     const rest = (g.homeRest ?? 7) - (g.awayRest ?? 7);
     if (Math.abs(rest) >= 3) out.push(`${rest > 0 ? g.home : g.away} has ${Math.abs(rest)} more days of rest`);
   }
-  out.push(`Model ${pct(bet.prob, 1)} vs. ${pct(bet.breakeven, 1)} needed to break even`);
+  out.push(`Model ${pct(bet.prob, 1)} vs. ${pct(bet.breakeven, 1)} needed to break even${bet.book ? ` at ${bookName(bet.book)}` : ""}`);
   return out;
 }
 
@@ -64,13 +84,22 @@ function trackedBet(b, stake) {
   const g = b.pred.game;
   if (stake == null) stake = b.ev > 0 ? settings().bankroll * Math.min(MAX_STAKE, b.kelly / 4) : window.GridIronTrack.defaultStake();
   let line = null;
-  if (b.market === "ATS") line = b.side === "home" ? -g.spread : g.spread;
-  if (b.market === "TOT") line = g.totalLine;
+  if (b.book) line = b.line;
+  else if (b.market === "ATS") line = b.side === "home" ? -g.spread : g.spread;
+  else if (b.market === "TOT") line = g.totalLine;
   return {
-    kind: "game", description: `${b.label} (${g.away} @ ${g.home})`, odds: b.american,
+    kind: "game", description: `${b.label} (${g.away} @ ${g.home})${b.book ? ` · ${bookName(b.book)}` : ""}`, odds: b.american,
     stake: Math.round(stake * 100) / 100, model_prob: Number(b.prob.toFixed(5)), edge: Number(b.ev.toFixed(5)),
     market: b.market, game_id: g.id, side: b.side, line, season: g.season, week: g.week,
   };
+}
+
+// The same side at other books, best first: " · also FanDuel -3 -105, BetMGM -3.5 -110".
+function otherPrices(b) {
+  const others = M.betOptions(b.pred).filter(o => o.market === b.market && o.side === b.side && o.book !== b.book)
+    .sort((x, y) => y.ev - x.ev).slice(0, 4);
+  const price = o => (o.market === "ML" ? M.fmtOdds(o.american) : `${o.label.split(" ").pop()} ${M.fmtOdds(o.american)}`);
+  return others.length ? ` <span class="muted small">· also ${others.map(o => `${bookName(o.book)} ${price(o)}`).join(", ")}</span>` : "";
 }
 
 function renderPicks() {
@@ -98,6 +127,7 @@ function renderPicks() {
       </div>
       <h3>${b.label} <span class="odds">${M.fmtOdds(b.american)}</span></h3>
       <p class="matchup">${g.away} @ ${g.home}${g.neutral ? " (neutral site)" : ""}</p>
+      ${b.book ? `<p class="best-book">Best price: <strong>${bookName(b.book)}</strong>${otherPrices(b)}</p>` : ""}
       <div class="meter" title="Model probability vs. break-even">
         <div class="fill" style="width:${(b.prob * 100).toFixed(1)}%"></div>
         <div class="mark" style="left:${(b.breakeven * 100).toFixed(1)}%"></div>
@@ -197,13 +227,99 @@ async function loadSplits() {
 }
 
 // Every side of a game with the model's chance and edge, each with Track and + Parlay.
+// Every side of a game: the best-priced book first, the other books one click deeper.
 function sideMenu(p) {
   const opts = M.betOptions(p);
   if (!opts.length) return "–";
-  return `<details class="side-menu"><summary>Track a side</summary><ul>${opts.map(o => `<li>
-      <span><strong>${o.label}</strong> ${M.fmtOdds(o.american)}
-        <span class="muted small">model ${pct(o.prob, 1)} · <span class="${o.ev >= 0 ? "pos" : "neg"}">${signed(o.ev * 100)}%</span></span></span>
-      ${window.GridIronTrack.actions(() => trackedBet(o))}</li>`).join("")}</ul></details>`;
+  const sides = new Map();
+  for (const o of opts) {
+    const k = `${o.market}|${o.side}`;
+    if (!sides.has(k)) sides.set(k, []);
+    sides.get(k).push(o);
+  }
+  const row = o => `<span><strong>${o.label}</strong> ${M.fmtOdds(o.american)}${o.book ? ` <span class="muted small">${bookName(o.book)}</span>` : ""}
+      <span class="muted small">model ${pct(o.prob, 1)} · <span class="${o.ev >= 0 ? "pos" : "neg"}">${signed(o.ev * 100)}%</span></span></span>
+    ${window.GridIronTrack.actions(() => trackedBet(o))}`;
+  return `<details class="side-menu"><summary>Track a side</summary><ul>${[...sides.values()].map(list => {
+    const [best, ...rest] = list.sort((a, b) => b.ev - a.ev);
+    return `<li>${row(best)}${rest.length ? `<details class="more-books"><summary>${rest.length} more book${rest.length > 1 ? "s" : ""}</summary>
+      <ul>${rest.map(o => `<li>${row(o)}</li>`).join("")}</ul></details>` : ""}</li>`;
+  }).join("")}</ul></details>`;
+}
+
+// ---- Other sportsbooks ---------------------------------------------------------
+// Supabase fetches The Odds API twice a day in season (the key stays in Supabase Vault)
+// and caches it in nfl_odds_cache. Each event's prices are matched to an upcoming game.
+function bookPrices(ev) {
+  const out = {};
+  for (const b of ev.bookmakers || []) {
+    const row = { updated: b.last_update };
+    for (const m of b.markets || []) {
+      const by = name => m.outcomes.find(o => o.name === name);
+      if (m.key === "h2h") { row.homeML = by(ev.home_team)?.price ?? null; row.awayML = by(ev.away_team)?.price ?? null; }
+      else if (m.key === "spreads") {
+        const h = by(ev.home_team), a = by(ev.away_team);
+        if (h && h.point != null) { row.homeSpread = h.point; row.homeSpreadOdds = h.price; row.awaySpreadOdds = a ? a.price : null; }
+      } else if (m.key === "totals") {
+        const o = by("Over"), u = by("Under");
+        if (o && o.point != null) { row.total = o.point; row.overOdds = o.price; row.underOdds = u ? u.price : null; }
+      }
+    }
+    out[b.key] = row;
+  }
+  return out;
+}
+
+function attachBooks() {
+  if (!state || books.status !== "ok") return;
+  for (const p of state.upcoming) p.game.books = null;
+  let matched = 0;
+  for (const ev of books.events) {
+    const home = TEAM_ABBR[ev.home_team], away = TEAM_ABBR[ev.away_team];
+    const when = Date.parse(ev.commence_time);
+    const p = state.upcoming.find(x => Math.abs(Date.parse(`${x.game.date}T12:00:00Z`) - when) < 3 * 864e5 &&
+      ((x.game.home === home && x.game.away === away) || (x.game.home === away && x.game.away === home)));
+    if (!p) continue;
+    const g = p.game, swapped = g.home !== home, prices = bookPrices(ev);
+    g.books = {};
+    for (const [key, b] of Object.entries(prices)) {
+      const row = swapped ? { updated: b.updated, homeML: b.awayML, awayML: b.homeML,
+        homeSpread: b.homeSpread == null ? null : -b.homeSpread, homeSpreadOdds: b.awaySpreadOdds, awaySpreadOdds: b.homeSpreadOdds,
+        total: b.total, overOdds: b.overOdds, underOdds: b.underOdds } : b;
+      // A spread far from the market line means the match went wrong; leave that book out.
+      if (g.spread != null && row.homeSpread != null && Math.abs(row.homeSpread + g.spread) > 7) continue;
+      g.books[key] = row;
+    }
+    if (Object.keys(g.books).length) matched++; else g.books = null;
+  }
+  books.matched = matched;
+}
+
+async function loadBooks() {
+  try {
+    const sb = window.GridIronAuth && window.GridIronAuth.client;
+    if (!sb) throw new Error("not signed in");
+    const { data, error } = await sb.from("nfl_odds_cache").select("fetched_at, body").eq("id", 1).maybeSingle();
+    if (error) throw error;
+    books = data && Array.isArray(data.body) && data.fetched_at
+      ? { status: "ok", fetchedAt: data.fetched_at, events: data.body } : { status: "off" };
+  } catch (err) {
+    books = { status: "error", error: err.message };
+  }
+  attachBooks();
+  renderBooksState();
+}
+
+function renderBooksState() {
+  const el = $("#books-state");
+  if (!el) return;
+  if (books.status === "ok") {
+    const names = [...new Set(books.events.flatMap(e => (e.bookmakers || []).map(b => b.key)))].map(bookName);
+    const at = new Date(books.fetchedAt).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+    el.textContent = `Prices from ${names.join(", ")} for ${books.matched || 0} upcoming games, updated ${at} (twice a day). Picks use the best price for each side.`;
+  } else if (books.status === "error") {
+    el.textContent = `Couldn't load other sportsbooks' lines (${books.error}). Picks use the market line.`;
+  } else el.textContent = "Other sportsbooks' lines aren't available yet. Picks use the market line.";
 }
 
 function renderGames() {
@@ -327,10 +443,12 @@ async function init() {
     $("#season").innerHTML = seasons.map(s => `<option>${s}</option>`).join("");
     $("#status").textContent = `Trained on ${played.length.toLocaleString()} games through the ${lastPlayed.season} ${weekLabel(lastPlayed)} results (${lastPlayed.date}). Reload after new games to update the model.`;
 
+    await loadBooks();
     renderAll();
     renderGames();
     renderPower();
     renderWeights();
+    setInterval(async () => { await loadBooks(); renderPicks(); renderGames(); }, BOOKS_REFRESH_MS);
     $("#edge").addEventListener("input", renderAll);
     $("#bankroll").addEventListener("input", renderPicks);
     $("#season").addEventListener("change", renderRecord);

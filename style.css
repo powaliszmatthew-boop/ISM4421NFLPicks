@@ -305,3 +305,9 @@ button:hover { border-color: var(--accent); }
 .slip-fields input { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
 .slip-buttons { display: flex; align-items: center; gap: 12px; }
 @media (prefers-color-scheme: dark) { .slip-toggle { background: var(--accent); color: #17202c; } .slip-count { background: #17202c; color: var(--accent); } }
+
+/* Best sportsbook price on pick cards and the per-side book list */
+.best-book { margin: -4px 0 10px; font-size: .88rem; }
+.more-books { flex-basis: 100%; margin-top: 2px; }
+.more-books summary { cursor: pointer; font-size: .8rem; color: var(--muted); }
+.more-books ul { margin-top: 6px; padding-left: 10px; }
