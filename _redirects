@@ -1,0 +1,3 @@
+# Keep source-only folders from being served.
+/supabase/*  /404.html  404!
+/netlify/*  /404.html  404!
