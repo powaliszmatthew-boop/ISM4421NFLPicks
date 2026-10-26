@@ -18,12 +18,12 @@
 # The repo root is published, so keep source-only folders from being served.
 [[redirects]]
   from = "/supabase/*"
-  to = "/404"
+  to = "/404.html"
   status = 404
   force = true
 
 [[redirects]]
   from = "/netlify/*"
-  to = "/404"
+  to = "/404.html"
   status = 404
   force = true
