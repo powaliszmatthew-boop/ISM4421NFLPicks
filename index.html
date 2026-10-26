@@ -4,28 +4,40 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GridIron Edge</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect x=%2730%27 y=%2730%27 width=%2740%27 height=%2740%27 rx=%275%27 transform=%27rotate(45 50 50)%27 fill=%27none%27 stroke=%27%237ee06a%27 stroke-width=%2710%27/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>GridIron Edge</h1>
-    <p class="tagline">NFL picks from week-to-week statistics and a model that keeps learning</p>
-    <nav class="site-nav" aria-label="Pages">
-      <a href="index.html" aria-current="page">Game picks</a>
-      <a href="props.html">Player props</a>
-      <a href="bets.html">My bets</a>
-    </nav>
-    <nav class="nav" aria-label="On this page">
-      <a href="#picks-h">Picks</a>
-      <a href="#money-h">Where the money is</a>
-      <a href="#games-h">All games</a>
-      <a href="#record-h">Track record</a>
-      <a href="#power-h">Rankings</a>
-      <a href="#key-h" class="key-link">Key: what everything means</a>
-    </nav>
+    <div class="gnav">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-name">GridIron Edge</span></a>
+      <nav class="site-nav" aria-label="Pages">
+        <a href="index.html" aria-current="page">Game picks</a>
+        <a href="props.html">Player props</a>
+        <a href="bets.html">My bets</a>
+      </nav>
+    </div>
   </header>
+  <div class="lnav">
+    <div class="lnav-in">
+      <div class="lnav-title">Game Picks</div>
+      <nav class="nav" aria-label="On this page">
+          <a href="#picks-h">Picks</a>
+          <a href="#money-h">Where the money is</a>
+          <a href="#games-h">All games</a>
+          <a href="#record-h">Track record</a>
+          <a href="#power-h">Rankings</a>
+          <a href="#key-h" class="key-link">Key: what everything means</a>
+      </nav>
+    </div>
+  </div>
 
   <main class="wrap" hidden>
+    <header class="hero">
+      <div class="eyebrow">NFL game picks</div>
+      <h1>Find the edge.<br>Every week.</h1>
+      <p class="hero-sub">NFL picks from week-to-week statistics and a model that keeps learning.</p>
+    </header>
     <p id="status" class="status" role="status">Loading NFL results and betting lines…</p>
     <p id="books-state" class="muted small"></p>
 
@@ -145,6 +157,13 @@
       <p class="disclaimer">For education and entertainment. Closing NFL lines are very efficient, and no model reliably beats them. Check the track record above before trusting any pick. Never bet more than you can afford to lose. Need help? Call 1-800-GAMBLER.</p>
     </section>
   </main>
+
+  <footer class="site-footer">
+    <div>
+      <div>Picks and odds are for education and entertainment. Please bet responsibly. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</div>
+      <div class="foot-row"><span>GridIron Edge</span><span>Data from nflverse, The Odds API, and DraftKings.</span></div>
+    </div>
+  </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
   <script src="config.js"></script>

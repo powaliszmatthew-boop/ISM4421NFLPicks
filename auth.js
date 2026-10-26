@@ -9,7 +9,7 @@
   const SAVE_DELAY = 600;
 
   // Account widget in the header and the sign-in form above <main>.
-  q(".topbar").insertAdjacentHTML("beforeend", `
+  (q(".gnav") || q(".topbar")).insertAdjacentHTML("beforeend", `
     <div id="account" class="account" hidden>
       <span id="user-email"></span>
       <button id="signout" type="button">Sign out</button>

@@ -4,67 +4,172 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My Bets · GridIron Edge</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect x=%2730%27 y=%2730%27 width=%2740%27 height=%2740%27 rx=%275%27 transform=%27rotate(45 50 50)%27 fill=%27none%27 stroke=%27%237ee06a%27 stroke-width=%2710%27/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>GridIron Edge</h1>
-    <p class="tagline">Every bet you've placed, settled automatically when results come in</p>
-    <nav class="site-nav" aria-label="Pages">
-      <a href="index.html">Game picks</a>
-      <a href="props.html">Player props</a>
-      <a href="bets.html" aria-current="page">My bets</a>
-    </nav>
-    <nav class="nav" aria-label="On this page">
-      <a href="#sum-h">Summary</a>
-      <a href="#add-h">Add a bet</a>
-      <a href="#list-h">All bets</a>
-    </nav>
+    <div class="gnav">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-name">GridIron Edge</span></a>
+      <nav class="site-nav" aria-label="Pages">
+        <a href="index.html">Game picks</a>
+        <a href="props.html">Player props</a>
+        <a href="bets.html" aria-current="page">My bets</a>
+      </nav>
+    </div>
   </header>
+  <div class="lnav">
+    <div class="lnav-in">
+      <div class="lnav-title">My Bets</div>
+      <nav class="nav" aria-label="On this page">
+        <a href="#summary">Summary</a>
+        <a href="#add">Add a bet</a>
+        <a href="#all">All bets</a>
+        <a href="#add" class="pill-link">Place bet</a>
+      </nav>
+    </div>
+  </div>
 
-  <main class="wrap" hidden>
-    <p id="status" class="status" role="status">Loading your bets…</p>
-
-    <section class="card" aria-labelledby="sum-h">
-      <div class="row-head">
-        <h2 id="sum-h">Summary</h2>
-        <label class="inline">Show
-          <select id="f-kind"><option value="">All bets</option><option value="game">Game bets</option><option value="prop">Player props</option><option value="parlay">Parlays</option></select>
-        </label>
+  <main hidden>
+    <header id="top" class="hero">
+      <div id="week-label" class="eyebrow">2026 Season</div>
+      <h1>Every bet.<br>Settled itself.</h1>
+      <p class="hero-sub">Log a ticket once. The moment the final whistle blows, GridIron Edge grades it, pays it out, and updates your record.</p>
+      <div class="hero-ctas">
+        <a href="#add" class="btn-light">Add a bet</a>
+        <a href="#all" class="text-link">See all bets ›</a>
       </div>
-      <div id="tiles" class="tiles"></div>
-      <div id="chart" class="chart"></div>
-      <p class="explain">Profit counts settled bets only: a win pays your stake times the odds, a loss costs the stake, and pushes and voids return it. Bets tracked from the Game picks or Player props pages settle themselves once the final score or stat line is posted.</p>
+    </header>
+
+    <section class="wrap" aria-label="Net profit">
+      <div class="stat-tile">
+        <div class="tile-label">Net profit · season</div>
+        <div id="profit" class="profit-big">$0</div>
+        <div class="profit-sub">
+          <span id="units">+0.0u</span><span class="sep">·</span><span id="roi">0.0% ROI</span><span class="sep">·</span><span id="settled-count">0 settled</span>
+        </div>
+        <div id="bars" class="bars" role="img" aria-label="Running profit after each settled bet"></div>
+      </div>
     </section>
 
-    <section class="card" aria-labelledby="add-h">
-      <h2 id="add-h">Add a bet</h2>
-      <p class="explain">For bets you placed on your own. The <strong>Track</strong> buttons on the Game picks and Player props pages add the model's picks with the details filled in, and they settle automatically. For a parlay, use <strong>+ Parlay</strong> on any pick (or <strong>Add as parlay leg</strong> below), then open the <strong>Parlay slip</strong> at the bottom left.</p>
-      <form id="add" class="calc">
-        <label><span>Type</span><select id="a-kind"><option value="game">Game bet</option><option value="prop">Player prop</option></select></label>
-        <label class="wide-field"><span>Bet</span><input id="a-desc" type="text" maxlength="200" required placeholder="e.g. Chiefs -3.5 or Kelce over 5.5 receptions"></label>
-        <label><span>Odds (American)</span><input id="a-odds" type="number" step="1" value="-110" required></label>
-        <label><span>Stake ($)</span><input id="a-stake" type="number" min="0" step="1" value="10" required></label>
-        <label><span>Date placed</span><input id="a-date" type="date" required></label>
-        <label><span>Result</span><select id="a-result"><option value="pending">Pending</option><option value="win">Win</option><option value="loss">Loss</option><option value="push">Push</option><option value="void">Void</option></select></label>
-        <label class="wide-field"><span>Notes (optional)</span><input id="a-notes" type="text" maxlength="500"></label>
-        <div class="form-end"><button type="submit" class="primary">Add bet</button>
-          <button type="button" id="a-slip" class="slip-btn">Add as parlay leg</button></div>
+    <section id="summary" class="bets-section" aria-labelledby="summary-h">
+      <h2 id="summary-h" class="section-title">Summary.</h2>
+      <p class="section-sub">Your whole season at a glance, graded the second the scoreboard goes final.</p>
+      <div class="bento">
+        <div class="wide">
+          <div class="bento-label">Record</div>
+          <div class="record">
+            <div><span id="rec-w" style="color:var(--green)">0</span><span>W</span></div>
+            <div><span id="rec-l" style="color:var(--red)">0</span><span>L</span></div>
+            <div><span id="rec-p" style="color:var(--dim)">0</span><span>P</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="bento-label">Win rate</div>
+          <div>
+            <div id="win-rate" class="bento-num">0%</div>
+            <div class="rate-bar"><div id="win-rate-bar" style="width:0%"></div></div>
+            <div class="bento-note">Break-even at −110 is 52.4%</div>
+          </div>
+        </div>
+        <div>
+          <div class="bento-label">Wagered</div>
+          <div>
+            <div id="wagered" class="bento-num">$0</div>
+            <div id="avg-stake" class="bento-note">Avg stake $0</div>
+          </div>
+        </div>
+        <div>
+          <div class="bento-label"><span class="dot-yellow"></span>Open</div>
+          <div>
+            <div id="open-count" class="bento-num">0</div>
+            <div id="open-payout" class="bento-note">$0 potential payout</div>
+          </div>
+        </div>
+        <div class="wide hit">
+          <div class="bento-label">Biggest hit</div>
+          <div>
+            <div id="best-pick" class="hit-pick">—</div>
+            <div id="best-meta" class="hit-meta"></div>
+            <div id="best-win" class="hit-win"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="add" class="bets-section center" aria-labelledby="add-h">
+      <h2 id="add-h" class="section-title">Add a bet.</h2>
+      <p class="section-sub">Enter it once. Bets you track from the picks pages grade themselves; set the result on the rest when the game ends.</p>
+      <form id="add-form" class="add-card" novalidate>
+        <div class="add-fields">
+          <label class="field">
+            <span class="field-label">Game</span>
+            <select id="a-game"><option value="">Loading games…</option></select>
+          </label>
+          <div class="field">
+            <span class="field-label" id="type-label">Bet type</span>
+            <div id="a-type" class="seg-ctl" role="group" aria-labelledby="type-label">
+              <button type="button" data-type="Spread" aria-pressed="true">Spread</button>
+              <button type="button" data-type="Moneyline" aria-pressed="false">Moneyline</button>
+              <button type="button" data-type="Total" aria-pressed="false">Total</button>
+              <button type="button" data-type="Prop" aria-pressed="false">Prop</button>
+            </div>
+          </div>
+          <label class="field">
+            <span class="field-label">Your pick</span>
+            <input id="a-pick" type="text" maxlength="160" autocomplete="off" placeholder="e.g. Bills +2.5">
+          </label>
+          <div class="field-pair">
+            <label class="field">
+              <span class="field-label">Odds</span>
+              <input id="a-odds" class="mono" type="text" inputmode="numeric" value="-110" autocomplete="off">
+            </label>
+            <label class="field">
+              <span class="field-label">Stake ($)</span>
+              <input id="a-stake" class="mono" type="text" inputmode="decimal" value="50" autocomplete="off">
+            </label>
+          </div>
+        </div>
+        <div class="ticket">
+          <div>
+            <div class="field-label">Ticket preview</div>
+            <div id="t-meta" class="ticket-meta"></div>
+            <div id="t-pick" class="ticket-pick"></div>
+            <div class="ticket-type"><span id="t-type">Spread</span> · <span id="t-odds" class="mono"></span></div>
+          </div>
+          <div class="ticket-money">
+            <div><div class="lbl">Risk</div><div id="t-risk" class="val">$0</div></div>
+            <div><div class="lbl">To win</div><div id="t-win" class="val" style="color:var(--green)">$0</div></div>
+          </div>
+          <button id="a-submit" type="submit" class="primary">Enter pick, odds &amp; stake</button>
+          <div class="ticket-alt"><button id="a-slip" type="button" class="link">Add to parlay slip instead</button></div>
+        </div>
       </form>
-      <p id="add-msg" class="auth-msg" role="status"></p>
     </section>
 
-    <section class="card" aria-labelledby="list-h">
-      <div class="row-head">
-        <h2 id="list-h">All bets</h2>
-        <label class="inline">Status
-          <select id="f-status"><option value="">All</option><option value="pending">Pending</option><option value="settled">Settled</option></select>
-        </label>
+    <section id="all" class="bets-section" aria-labelledby="all-h" style="padding-bottom:120px">
+      <div class="list-head">
+        <div>
+          <h2 id="all-h" class="section-title">All bets.</h2>
+          <p id="status" class="section-sub" role="status">Loading your bets…</p>
+        </div>
+        <div id="filters" class="pills" role="group" aria-label="Filter bets">
+          <button type="button" data-filter="all" aria-pressed="true">All<span class="count">0</span></button>
+          <button type="button" data-filter="pending" aria-pressed="false">Open<span class="count">0</span></button>
+          <button type="button" data-filter="win" aria-pressed="false">Won<span class="count">0</span></button>
+          <button type="button" data-filter="loss" aria-pressed="false">Lost<span class="count">0</span></button>
+        </div>
       </div>
-      <p class="explain">Change odds, stake, or result right in the table. It saves as soon as you change it. A parlay lists its legs; set a leg's result and the parlay updates: any lost leg loses it, and pushed or voided legs drop out of the payout.</p>
-      <div class="scroll"><table id="list" class="table"></table></div>
+      <div id="list" class="bet-list"></div>
     </section>
   </main>
+
+  <footer class="site-footer">
+    <div>
+      <div>Odds and results are for tracking purposes only. Please bet responsibly. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</div>
+      <div class="foot-row"><span>GridIron Edge</span><span>Tracked bets settle automatically when results come in.</span></div>
+    </div>
+  </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
   <script src="config.js"></script>
