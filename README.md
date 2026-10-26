@@ -44,7 +44,7 @@ python3 -m http.server 8000
 
 The live betting splits need the Netlify function, so they only appear when deployed or when run with `netlify dev`.
 
-To deploy on Netlify, import this repo. `netlify.toml` publishes the repo root and deploys the function, and no build command is needed. A Git-connected site redeploys on every push to `main`. Drag-and-drop deploys don't include functions.
+To deploy on Netlify, import this repo. `netlify.toml` publishes the repo root, deploys the functions, and sets security headers (Content-Security-Policy and friends), and no build command is needed. If you add a script or data source from another site, add it to the CSP there. A Git-connected site redeploys on every push to `main`. Drag-and-drop deploys don't include functions.
 
 ## Caveat
 

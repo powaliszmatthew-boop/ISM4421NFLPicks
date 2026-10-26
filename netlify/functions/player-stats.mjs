@@ -5,6 +5,7 @@
 const URL_FOR = season =>
   `https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_${season}.csv`;
 const POSITIONS = new Set(["QB", "RB", "WR", "TE"]);
+const TEAM_RE = /^[A-Z]{2,3}$/;
 export const STAT_COLS = [
   "completions", "attempts", "passing_yards", "passing_tds", "passing_interceptions",
   "carries", "rushing_yards", "rushing_tds", "receptions", "targets", "receiving_yards", "receiving_tds",
@@ -39,6 +40,8 @@ export function compact(csvTexts) {
     const statIx = STAT_COLS.map(at);
     for (const r of data) {
       if (r.length !== header.length || !POSITIONS.has(r[ix.pos]) || r[ix.type] === "PRE") continue;
+      // IDs and team codes end up in the page's HTML unescaped, so skip rows that don't look like them.
+      if (!/^[\w-]{1,20}$/.test(r[ix.id]) || !TEAM_RE.test(r[ix.team]) || !TEAM_RE.test(r[ix.opp])) continue;
       players[r[ix.id]] = [r[ix.name], r[ix.pos]];
       rows.push([r[ix.id], r[ix.team], r[ix.opp], Number(r[ix.season]), Number(r[ix.week]),
         ...statIx.map(i => Number(r[i]) || 0)]);

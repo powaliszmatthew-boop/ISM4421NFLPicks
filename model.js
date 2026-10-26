@@ -42,15 +42,20 @@
 
   const num = v => (v === "" || v === "NA" || v == null ? null : Number(v));
   const team = t => RELOCATED[t] || t;
+  // The CSV is third-party data that ends up in the page's HTML, so text fields must match
+  // their expected shape; anything else is dropped rather than rendered.
+  const shape = (v, re) => (re.test(v || "") ? v : "");
+  const TEAM_RE = /^[A-Z]{2,3}$/;
 
   function toGames(rows) {
-    return rows.map(r => ({
+    return rows.filter(r => /^[\w-]{1,40}$/.test(r.game_id || "") &&
+      TEAM_RE.test(r.away_team || "") && TEAM_RE.test(r.home_team || "")).map(r => ({
       id: r.game_id,
       season: Number(r.season),
       week: Number(r.week),
-      type: r.game_type,
-      date: r.gameday,
-      time: r.gametime,
+      type: shape(r.game_type, /^[A-Z]{2,4}$/),
+      date: shape(r.gameday, /^\d{4}-\d{2}-\d{2}$/),
+      time: shape(r.gametime, /^\d{1,2}:\d{2}$/),
       away: team(r.away_team),
       home: team(r.home_team),
       awayScore: num(r.away_score),

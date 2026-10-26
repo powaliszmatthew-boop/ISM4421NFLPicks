@@ -8,7 +8,8 @@ const MAX_PAGES = 4;
 const TEAM_FIX = { LAR: "LA", JAC: "JAX", WSH: "WAS", LVR: "LV" };
 
 const team = abbr => TEAM_FIX[abbr] || abbr;
-const text = html => html.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+// Leftover angle brackets and quotes are dropped so scraped text can't carry markup into the app.
+const text = html => html.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/[<>"']/g, "").replace(/\s+/g, " ").trim();
 const odds = s => Number(s.replace("−", "-").replace("+", ""));
 
 function parseRow(row) {

@@ -2,3 +2,28 @@
 [build]
   publish = "."
   functions = "netlify/functions"
+
+# Security headers for every page. Scripts load only from this site and the pinned supabase-js on jsDelivr;
+# 'unsafe-inline' styles cover the style="width:…" bars drawn by the app.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://doxbwuyctzfkecbpaqna.supabase.co wss://doxbwuyctzfkecbpaqna.supabase.co https://raw.githubusercontent.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+# The repo root is published, so keep source-only folders from being served.
+[[redirects]]
+  from = "/supabase/*"
+  to = "/404"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/netlify/*"
+  to = "/404"
+  status = 404
+  force = true

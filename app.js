@@ -16,7 +16,8 @@ const BOOK_NAMES = {
   betmgm: "BetMGM", williamhill_us: "Caesars", espnbet: "theScore Bet", fanatics: "Fanatics", betrivers: "BetRivers",
   bovada: "Bovada",
 };
-const bookName = k => (k ? BOOK_NAMES[k] || k : "Market line");
+// Unknown keys come straight from The Odds API, so escape them before they reach the HTML.
+const bookName = k => (k ? BOOK_NAMES[k] || window.GridIronTrack.esc(k) : "Market line");
 // The Odds API uses full team names; the game data uses nflverse abbreviations.
 const TEAM_ABBR = {
   "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
@@ -195,7 +196,7 @@ function renderSplits() {
     (missing.length ? ` Not posted yet: ${missing.join(", ")}.` : "");
   box.innerHTML = games.map(s => {
     const pred = order.get(`${s.away}@${s.home}`);
-    const when = pred ? `${weekLabel(pred.game)} · ${kickoff(pred.game)}` : s.time;
+    const when = pred ? `${weekLabel(pred.game)} · ${kickoff(pred.game)}` : window.GridIronTrack.esc(s.time);
     const recSides = m => recs.filter(b => b.pred === pred && b.market === m).map(b => b.side);
     const line = x => (x && x.line != null ? M.fmtLine(x.line) : "");
     return `<article class="split-card">
@@ -250,12 +251,18 @@ function sideMenu(p) {
 // ---- Other sportsbooks ---------------------------------------------------------
 // Supabase fetches The Odds API twice a day in season (the key stays in Supabase Vault)
 // and caches it in nfl_odds_cache. Each event's prices are matched to an upcoming game.
+// Prices and points are forced to numbers (or null) because they're rendered into the page.
+const numOrNull = v => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+
 function bookPrices(ev) {
   const out = {};
   for (const b of ev.bookmakers || []) {
     const row = { updated: b.last_update };
     for (const m of b.markets || []) {
-      const by = name => m.outcomes.find(o => o.name === name);
+      const by = name => {
+        const o = (m.outcomes || []).find(x => x.name === name);
+        return o && { price: numOrNull(o.price), point: numOrNull(o.point) };
+      };
       if (m.key === "h2h") { row.homeML = by(ev.home_team)?.price ?? null; row.awayML = by(ev.away_team)?.price ?? null; }
       else if (m.key === "spreads") {
         const h = by(ev.home_team), a = by(ev.away_team);
