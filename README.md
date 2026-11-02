@@ -30,9 +30,11 @@ Walk-forward backtest (2025 to tune, 2026 Weeks 1–6 unseen): projections were 
 
 ## Accounts
 
-Sign-in uses email and password through Supabase Auth (project `ISM4421NFLPicks`). The app stays hidden until someone signs in. Each user's settings (`user_settings`), bets (`bets`, `bet_legs`), and saved props (`props`) are stored in Supabase, and row-level security limits every user to their own rows. The project URL and publishable key are in `config.js`. The table definition is in `supabase/migrations/`.
+Sign-in uses email and password, or **Continue with Google**, through Supabase Auth (project `ISM4421NFLPicks`). The app stays hidden until someone signs in. Each user's settings (`user_settings`), bets (`bets`, `bet_legs`), and saved props (`props`) are stored in Supabase, and row-level security limits every user to their own rows. The project URL and publishable key are in `config.js`. The table definition is in `supabase/migrations/`.
 
-In the Supabase dashboard under **Authentication → URL Configuration**, **Site URL** and **Redirect URLs** must include `https://gridironedgenfl.netlify.app`, or confirmation and password-reset links won't come back to the app.
+In the Supabase dashboard under **Authentication → URL Configuration**, **Site URL** and **Redirect URLs** must include `https://gridironedgenfl.netlify.app`, or confirmation links, password-reset links, and Google sign-ins won't come back to the app.
+
+Google sign-in needs **Authentication → Sign In / Providers → Google** enabled with the Google OAuth client ID and secret, and the Google client's **Authorized redirect URIs** must include `https://doxbwuyctzfkecbpaqna.supabase.co/auth/v1/callback`. Once signed in, the header shows the name and picture from the user's `user_metadata` (falling back to their email).
 
 ## Run locally
 

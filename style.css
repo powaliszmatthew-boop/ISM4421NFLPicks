@@ -74,9 +74,11 @@ h3 { font-family: var(--cond); font-weight: 700; font-size: 1.5rem; text-transfo
 .account { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 .account button {
   border: 1px solid var(--line-2); background: transparent; color: var(--text-2);
-  border-radius: 980px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+  border-radius: 980px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap;
 }
 .account button:hover { color: #fff; border-color: var(--muted); }
+.account .avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex: none; }
+#user-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 
 .lnav {
   position: sticky; top: 0; z-index: 20; height: 52px;
@@ -351,6 +353,16 @@ button:hover { background: var(--card-hi); }
 .auth-msg.error { color: var(--neg); }
 .auth-msg.ok { color: var(--pos); }
 .auth-links { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.auth-oauth { display: flex; flex-direction: column; gap: 16px; }
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 13px 16px; border-radius: 14px; cursor: pointer;
+  background: #fff; color: #1f1f1f; border: 1px solid #dadce0; font: inherit; font-size: 16px; font-weight: 600;
+}
+.google-btn:hover { background: #f2f2f2; }
+.google-btn:disabled { opacity: .55; cursor: default; }
+.auth-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--line-2); }
 
 .site-footer { border-top: 1px solid var(--line); background: var(--bg-2); }
 .site-footer > div { max-width: 1024px; margin: 0 auto; padding: 22px; font-size: 12px; color: #6e6e73; line-height: 1.6; display: flex; flex-direction: column; gap: 10px; }
@@ -359,7 +371,7 @@ button:hover { background: var(--card-hi); }
 @media (max-width: 640px) {
   .gnav { gap: 12px; padding: 0 16px; }
   .site-nav { gap: 14px; }
-  #user-email { display: none; }
+  #user-name { display: none; }
   .lnav-in, .wrap, .hero { padding-left: 16px; padding-right: 16px; }
   .hero { padding-top: 64px; }
   .key { grid-template-columns: 1fr; }

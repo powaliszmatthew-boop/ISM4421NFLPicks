@@ -1,4 +1,4 @@
-// Email + password accounts (Supabase Auth), shared by every page.
+// Email + password and Google accounts (Supabase Auth), shared by every page.
 // Each page's <main> stays hidden until sign-in, then auth.js calls window.GridIron.start().
 // Pages with #edge / #bankroll / .markets controls also get those settings saved per user.
 (function () {
@@ -11,13 +11,21 @@
   // Account widget in the header and the sign-in form above <main>.
   (q(".gnav") || q(".topbar")).insertAdjacentHTML("beforeend", `
     <div id="account" class="account" hidden>
-      <span id="user-email"></span>
+      <img id="user-avatar" class="avatar" alt="" referrerpolicy="no-referrer" hidden>
+      <span id="user-name"></span>
       <button id="signout" type="button">Sign out</button>
     </div>`);
   main.insertAdjacentHTML("beforebegin", `
     <section id="auth" class="auth wrap" aria-labelledby="auth-title" hidden>
       <form id="auth-form" class="card auth-card">
         <h2 id="auth-title">Sign in</h2>
+        <div id="auth-oauth" class="auth-oauth">
+          <button id="auth-google" type="button" class="google-btn">
+            <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            <span>Continue with Google</span>
+          </button>
+          <div class="auth-or"><span>or</span></div>
+        </div>
         <label id="auth-email-row">
           <span>Email</span>
           <input id="auth-email" type="email" autocomplete="email" required>
@@ -39,14 +47,16 @@
   // Recovery links land with "#...type=recovery" in the URL. Read it before the
   // client consumes the hash, so the app doesn't flash before the reset form.
   let recovering = /type=recovery/.test(location.hash);
-  // Expired or reused email links come back as "#error_description=...".
-  let linkError = new URLSearchParams(location.hash.slice(1)).get("error_description");
+  // Expired email links and failed Google sign-ins come back as "error_description=..."
+  // in the hash or the query string.
+  let linkError = new URLSearchParams(location.hash.slice(1)).get("error_description")
+    || new URLSearchParams(location.search).get("error_description");
   let mode = recovering ? "reset" : "signin";
   let user = null, saveTimer = null;
 
   const VIEWS = {
-    signin: { title: "Sign in", button: "Sign in", password: true, links: ["signup", "forgot"] },
-    signup: { title: "Create an account", button: "Create account", password: true, links: ["signin"] },
+    signin: { title: "Sign in", button: "Sign in", password: true, oauth: true, links: ["signup", "forgot"] },
+    signup: { title: "Create an account", button: "Create account", password: true, oauth: true, links: ["signin"] },
     forgot: { title: "Reset your password", button: "Email me a reset link", password: false, links: ["signin"] },
     reset: { title: "Choose a new password", button: "Save new password", password: true, email: false, links: [] },
   };
@@ -74,6 +84,7 @@
     const v = VIEWS[mode];
     q("#auth-title").textContent = v.title;
     q("#auth-submit").textContent = v.button;
+    q("#auth-oauth").hidden = !v.oauth;
     q("#auth-email-row").hidden = v.email === false;
     emailIn.required = v.email !== false;
     q("#auth-password-row").hidden = !v.password;
@@ -97,11 +108,35 @@
     window.GridIronAuth.user = u;
     authBox.hidden = true;
     account.hidden = false;
-    q("#user-email").textContent = u.email;
+    showProfile(u);
     if (firstLoad && hasSettings) await loadSettings();
     main.hidden = false;
     document.dispatchEvent(new CustomEvent("gridiron:auth", { detail: { user: u } }));
     if (window.GridIron) window.GridIron.start(u);
+  }
+
+  // Name and picture from user_metadata (Google fills these in); email is the fallback.
+  function showProfile(u) {
+    const meta = u.user_metadata || {};
+    const name = meta.full_name || meta.name || u.email || "";
+    const pic = meta.avatar_url || meta.picture || "";
+    const img = q("#user-avatar");
+    q("#user-name").textContent = name;
+    account.title = u.email || "";
+    img.hidden = !/^https:\/\//.test(pic);
+    if (img.hidden) img.removeAttribute("src"); else img.src = pic;
+  }
+
+  async function signInWithGoogle() {
+    const btn = q("#auth-google");
+    btn.disabled = true;
+    say("Opening Google…");
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: location.origin + location.pathname },
+    });
+    // On success the browser leaves for Google, so only errors land here.
+    if (error) { say(error.message, "error"); btn.disabled = false; }
   }
 
   function applySettings(s) {
@@ -183,6 +218,7 @@
     showAuth("signin");
     say("Couldn't load the sign-in service. Check your connection and reload.", "error");
     q("#auth-submit").disabled = true;
+    q("#auth-google").disabled = true;
     return;
   }
 
@@ -191,6 +227,8 @@
   window.GridIronAuth.client = sb;
 
   form.addEventListener("submit", submit);
+  q("#auth-google").addEventListener("click", signInWithGoogle);
+  q("#user-avatar").addEventListener("error", e => { e.target.hidden = true; });
   q("#auth-links").addEventListener("click", e => {
     if (e.target.dataset.mode) setMode(e.target.dataset.mode);
   });
@@ -214,7 +252,7 @@
       document.dispatchEvent(new CustomEvent("gridiron:auth", { detail: { user: null } }));
       showAuth("signin");
       if (linkError) {
-        say(`${linkError}. Request a new link below.`, "error");
+        say(`${linkError}. Please try again.`, "error");
         history.replaceState(null, "", location.origin + location.pathname);
         linkError = null;
       }
