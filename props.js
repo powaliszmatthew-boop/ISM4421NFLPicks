@@ -325,6 +325,15 @@ $("#c-stat").addEventListener("change", () => { setFairLine(); renderCalc(); });
 for (const id of ["#c-line", "#c-over", "#c-under", "#c-book"]) $(id).addEventListener("input", renderCalc);
 $("#calc").addEventListener("submit", e => e.preventDefault());
 
+// "Sort by" date option shared by Top plays and the projections table. Array sort is stable,
+// so rows in the same game keep their best-first order.
+function sortByGame(list, order, gameOf) {
+  const when = x => `${gameOf(x).date} ${gameOf(x).time || ""}`;
+  if (order === "soonest") list.sort((a, b) => when(a).localeCompare(when(b)));
+  if (order === "latest") list.sort((a, b) => when(b).localeCompare(when(a)));
+  return list;
+}
+
 // ---- Projections table ----------------------------------------------------
 function renderProj() {
   const key = $("#p-stat").value, pos = $("#p-pos").value, term = $("#p-search").value.trim().toLowerCase();
@@ -332,12 +341,13 @@ function renderProj() {
   const list = players.filter(p => p.props[key] && (!pos || p.pos === pos) &&
       (!term || p.name.toLowerCase().includes(term) || p.team.toLowerCase() === term || p.opp.toLowerCase() === term))
     .sort((a, b) => b.props[key].mean - a.props[key].mean);
+  sortByGame(list, $("#p-sort").value, p => p.game);
   const shown = showAllProj ? list : list.slice(0, PROJ_ROWS);
   $("#proj").innerHTML = `<thead><tr><th>Player</th><th>Game</th><th>Avg ${st.short}</th><th>Fair line</th>
     <th>Over fair line</th><th>Games</th><th></th></tr></thead><tbody>${shown.map(p => {
       const pr = p.props[key], fl = PM.fairLine(pr), probs = PM.lineProbs(pr, fl);
       return `<tr><td><strong>${T.esc(p.name)}</strong> <span class="muted small">${p.pos}</span></td>
-        <td>${p.team} ${p.team === p.game.home ? "vs" : "@"} ${p.opp}</td><td>${fmtNum(pr.mean, key)}</td><td>${fl}</td>
+        <td>${p.team} ${p.team === p.game.home ? "vs" : "@"} ${p.opp} <span class="muted small">${kickoff(p.game)}</span></td><td>${fmtNum(pr.mean, key)}</td><td>${fl}</td>
         <td>${pct(probs.over, 0)}</td><td>${pr.games}</td>
         <td><button type="button" class="link" data-price="${p.id}" data-game="${p.game.id}">Price it</button></td></tr>`;
     }).join("") || `<tr><td colspan="7" class="muted">No players match.</td></tr>`}</tbody>`;
@@ -349,7 +359,7 @@ $("#proj").addEventListener("click", e => {
   if (e.target.dataset.price) priceInCalc(e.target.dataset.price, e.target.dataset.game, $("#p-stat").value);
 });
 $("#p-more").addEventListener("click", () => { showAllProj = true; renderProj(); });
-for (const id of ["#p-stat", "#p-pos"]) $(id).addEventListener("change", () => { showAllProj = false; renderProj(); });
+for (const id of ["#p-stat", "#p-pos", "#p-sort"]) $(id).addEventListener("change", () => { showAllProj = false; renderProj(); });
 $("#p-search").addEventListener("input", () => { showAllProj = false; renderProj(); });
 
 // ---- Top plays & player outlook -----------------------------------------------
@@ -399,10 +409,7 @@ function renderPlays() {
   const list = all
     ? Object.keys(PM.STATS).flatMap(k => rankedFor(k, pos)).sort((a, b) => a.rank - b.rank || b.of - a.of)
     : rankedFor(sel, pos);
-  // Optional date sort. Array sort is stable, so plays in the same game keep the best-first order.
-  const order = $("#t-sort").value, when = x => `${x.p.game.date} ${x.p.game.time || ""}`;
-  if (order === "soonest") list.sort((a, b) => when(a).localeCompare(when(b)));
-  if (order === "latest") list.sort((a, b) => when(b).localeCompare(when(a)));
+  sortByGame(list, $("#t-sort").value, x => x.p.game);
   $("#plays").innerHTML = list.slice(0, topLimit).map(({ p, key, proj, rank, of }) => {
     const st = PM.STATS[key], g = p.game, avg5 = recent(p.id, key);
     let headline, sub;
