@@ -399,6 +399,10 @@ function renderPlays() {
   const list = all
     ? Object.keys(PM.STATS).flatMap(k => rankedFor(k, pos)).sort((a, b) => a.rank - b.rank || b.of - a.of)
     : rankedFor(sel, pos);
+  // Optional date sort. Array sort is stable, so plays in the same game keep the best-first order.
+  const order = $("#t-sort").value, when = x => `${x.p.game.date} ${x.p.game.time || ""}`;
+  if (order === "soonest") list.sort((a, b) => when(a).localeCompare(when(b)));
+  if (order === "latest") list.sort((a, b) => when(b).localeCompare(when(a)));
   $("#plays").innerHTML = list.slice(0, topLimit).map(({ p, key, proj, rank, of }) => {
     const st = PM.STATS[key], g = p.game, avg5 = recent(p.id, key);
     let headline, sub;
@@ -427,6 +431,7 @@ function renderPlays() {
 
 $("#t-stat").addEventListener("change", () => { topLimit = TOP_ROWS; renderPlays(); });
 $("#t-pos").addEventListener("change", () => { topLimit = TOP_ROWS; renderPlays(); });
+$("#t-sort").addEventListener("change", () => { topLimit = TOP_ROWS; renderPlays(); });
 $("#t-more").addEventListener("click", () => { topLimit += TOP_ROWS; renderPlays(); });
 $("#plays").addEventListener("click", e => {
   if (!e.target.dataset.outlook) return;
