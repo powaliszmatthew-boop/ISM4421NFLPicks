@@ -383,7 +383,36 @@ function milestoneRows(pl, key, proj) {
   }).join("");
 }
 
+// "All props": every milestone for every player and prop type, most likely to hit first.
+const ALL_ROWS = 25;
+function renderAllPlays() {
+  const pos = $("#t-pos").value;
+  const list = players.filter(p => !pos || p.pos === pos).flatMap(p =>
+    Object.entries(p.props).filter(([key, proj]) => relevant(proj, key)).flatMap(([key, proj]) =>
+      PM.milestones(proj).filter(m => PM.fairOdds(m.prob) != null).map(m => ({ p, key, m }))))
+    .sort((a, b) => b.m.prob - a.m.prob || a.p.name.localeCompare(b.p.name));
+  const limit = topLimit / TOP_ROWS * ALL_ROWS;
+  const rows = list.slice(0, limit).map(({ p, key, m }, i) => {
+    const g = p.game, b = milestoneBet(p, key, m);
+    const prop = isTd(key) ? "Scores a TD" : `${m.at}+ ${PM.STATS[key].short}`;
+    return `<tr><td class="muted">${i + 1}</td>
+      <td><strong>${T.esc(p.name)}</strong> <span class="muted small">${p.pos} · ${p.team} ${p.team === g.home ? "vs" : "@"} ${p.opp} · Wk ${g.week}</span></td>
+      <td>${prop}</td><td><strong>${pct(m.prob)}</strong></td><td>${T.fmtOdds(b.odds)}</td>
+      <td>${T.actions(b)}</td>
+      <td><button type="button" class="link small" data-outlook="${p.id}" data-game="${g.id}">Full outlook</button></td></tr>`;
+  }).join("");
+  $("#plays").innerHTML = rows
+    ? `<div class="scroll"><table class="table all-plays"><thead><tr><th>#</th><th>Player</th><th>Prop</th><th>Chance</th>
+        <th>Fair odds</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : '<p class="muted">No players to show.</p>';
+  $("#t-more").hidden = list.length <= limit;
+  $("#t-more").textContent = `Show more (${list.length - limit} left)`;
+}
+
 function renderPlays() {
+  const all = $("#t-stat").value === "all";
+  $("#plays").classList.toggle("as-table", all);
+  if (all) { renderAllPlays(); return; }
   const key = $("#t-stat").value, pos = $("#t-pos").value, st = PM.STATS[key];
   const list = players.filter(p => p.props[key] && (!pos || p.pos === pos) && relevant(p.props[key], key))
     .map(p => ({ p, proj: p.props[key], score: isTd(key) ? PM.lineProbs(p.props[key], 0.5).over : p.props[key].mean }))
@@ -573,8 +602,8 @@ async function init() {
   }
   $("#p-stat").innerHTML = Object.entries(PM.STATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
   $("#p-stat").value = "rec_yds";
-  $("#t-stat").innerHTML = $("#p-stat").innerHTML;
-  $("#t-stat").value = "anytime_td";
+  $("#t-stat").innerHTML = '<option value="all">All props (most likely first)</option>' + $("#p-stat").innerHTML;
+  $("#t-stat").value = "all";
   renderPlays();
   fillOutlookList();
   showOutlook(null);
