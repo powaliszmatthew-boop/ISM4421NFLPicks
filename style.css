@@ -277,7 +277,6 @@ button:hover { background: var(--card-hi); }
 
 /* Player props */
 .plays { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 16px; margin-top: 8px; }
-.plays.as-table { display: block; }
 .play-head strong { font-family: var(--cond); font-weight: 700; font-size: 24px; text-transform: uppercase; }
 .play-head { margin-bottom: 4px; }
 .play-line { margin: 6px 0 2px; font-size: 16px; }
@@ -373,8 +372,6 @@ button:hover { background: var(--card-hi); }
   .gnav { gap: 12px; padding: 0 16px; }
   .site-nav { gap: 14px; }
   #user-name { display: none; }
-  .all-plays th, .all-plays td { padding-left: 6px; padding-right: 6px; }
-  .all-plays td:nth-child(2) .muted { display: block; }
   .lnav-in, .wrap, .hero { padding-left: 16px; padding-right: 16px; }
   .hero { padding-top: 64px; }
   .key { grid-template-columns: 1fr; }
