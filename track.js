@@ -125,11 +125,7 @@
     const signedIn = !!(window.GridIronAuth && window.GridIronAuth.user);
     root.hidden = !signedIn;
     if (!signedIn) return;
-    const c = combined();
-    const oddsUsed = Number(oddsOverride) || c.odds;
-    const st = stake === "" ? defaultStake() : Number(stake);
-    const payout = oddsUsed ? st * decimal(oddsUsed) : 0;
-    const ev = c.prob != null && oddsUsed ? c.prob * decimal(oddsUsed) - 1 : null;
+    const c = combined(), { st } = slipTotals();
     root.classList.toggle("open", open);
     root.innerHTML = `
       <button type="button" class="slip-toggle" data-slip="toggle" aria-expanded="${open}">
@@ -151,8 +147,8 @@
           <dl class="slip-sum">
             <div><dt>Combined odds</dt><dd>${fmtOdds(c.odds)}</dd></div>
             <div><dt>Model chance</dt><dd>${c.prob != null ? pct(c.prob) : "–"}</dd></div>
-            <div><dt>Edge (EV)</dt><dd class="${ev == null ? "" : ev >= 0 ? "pos" : "neg"}">${ev == null ? "–" : `${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}%`}</dd></div>
-            <div><dt>Pays</dt><dd>$${payout.toFixed(2)}</dd></div>
+            <div><dt>Edge (EV)</dt><dd data-slip-sum="ev"></dd></div>
+            <div><dt>Pays</dt><dd data-slip-sum="pays"></dd></div>
           </dl>
           ${c.sameGame ? '<p class="small warn">Two or more legs are from the same game. Their results are linked, so the real chance can differ from the model\'s, and books price same-game parlays differently.</p>' : ""}
           <div class="slip-fields">
@@ -164,6 +160,25 @@
             <button type="button" class="link" data-slip="clear">Clear</button>
           </div>` : legs.length ? '<p class="muted small">Add at least one more leg to make a parlay.</p><button type="button" class="link" data-slip="clear">Clear</button>' : ""}
       </div>`;
+    updateSlipSums();
+  }
+
+  // The parts of the slip that change while typing in the odds and stake boxes.
+  function slipTotals() {
+    const c = combined();
+    const oddsUsed = Number(oddsOverride) || c.odds;
+    const st = stake === "" ? defaultStake() : Number(stake);
+    return { st, payout: oddsUsed ? st * decimal(oddsUsed) : 0,
+      ev: c.prob != null && oddsUsed ? c.prob * decimal(oddsUsed) - 1 : null };
+  }
+
+  function updateSlipSums() {
+    const evEl = document.querySelector('#slip [data-slip-sum="ev"]'), paysEl = document.querySelector('#slip [data-slip-sum="pays"]');
+    if (!evEl || !paysEl) return;
+    const { ev, payout } = slipTotals();
+    evEl.textContent = ev == null ? "–" : `${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}%`;
+    evEl.className = ev == null ? "" : ev >= 0 ? "pos" : "neg";
+    paysEl.textContent = `$${payout.toFixed(2)}`;
   }
 
   async function trackParlay(btn) {
@@ -201,16 +216,13 @@
     else if (t.dataset.slipRemove != null) { legs.splice(Number(t.dataset.slipRemove), 1); oddsOverride = ""; store(); renderSlip(); }
   }
 
-  // Typing in the odds or stake box updates the totals without losing focus.
+  // Typing in the odds or stake box updates only the totals. The box itself is never redrawn,
+  // so the cursor stays where the user is typing.
   function onSlipInput(e) {
     const which = e.target.dataset.slipInput;
     if (!which) return;
     if (which === "odds") oddsOverride = e.target.value; else stake = e.target.value;
-    const pos = e.target.selectionStart;
-    renderSlip();
-    const again = document.querySelector(`[data-slip-input="${which}"]`);
-    again.focus();
-    try { again.setSelectionRange(pos, pos); } catch { /* number inputs don't support selection */ }
+    updateSlipSums();
   }
 
   function onSlipSubmit(e) {
