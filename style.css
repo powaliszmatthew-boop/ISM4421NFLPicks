@@ -279,6 +279,7 @@ button:hover { background: var(--card-hi); }
 .plays { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 16px; margin-top: 8px; }
 .play-head strong { font-family: var(--cond); font-weight: 700; font-size: 24px; text-transform: uppercase; }
 .play-head { margin-bottom: 4px; }
+.play-tag { margin: 2px 0 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--green); }
 .play-line { margin: 6px 0 2px; font-size: 16px; }
 .play-line strong { color: var(--green); }
 .play-sub { margin: 0 0 12px; }

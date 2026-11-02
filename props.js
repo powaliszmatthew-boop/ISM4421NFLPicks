@@ -383,13 +383,24 @@ function milestoneRows(pl, key, proj) {
   }).join("");
 }
 
-function renderPlays() {
-  const key = $("#t-stat").value, pos = $("#t-pos").value, st = PM.STATS[key];
+// One prop type's top plays, sorted the usual way: biggest projection first (anytime TD: best chance to score).
+function rankedFor(key, pos) {
   const list = players.filter(p => p.props[key] && (!pos || p.pos === pos) && relevant(p.props[key], key))
-    .map(p => ({ p, proj: p.props[key], score: isTd(key) ? PM.lineProbs(p.props[key], 0.5).over : p.props[key].mean }))
+    .map(p => ({ p, key, proj: p.props[key], score: isTd(key) ? PM.lineProbs(p.props[key], 0.5).over : p.props[key].mean }))
     .sort((a, b) => b.score - a.score);
-  $("#plays").innerHTML = list.slice(0, topLimit).map(({ p, proj }) => {
-    const g = p.game, avg5 = recent(p.id, key);
+  list.forEach((x, i) => { x.rank = i + 1; x.of = list.length; });
+  return list;
+}
+
+function renderPlays() {
+  const sel = $("#t-stat").value, pos = $("#t-pos").value, all = sel === "all";
+  // All Props: every prop type in one list. Raw projections can't be compared across types
+  // (300 passing yards vs 6 catches), so merge by rank within each type: every #1 first, then every #2, ...
+  const list = all
+    ? Object.keys(PM.STATS).flatMap(k => rankedFor(k, pos)).sort((a, b) => a.rank - b.rank || b.of - a.of)
+    : rankedFor(sel, pos);
+  $("#plays").innerHTML = list.slice(0, topLimit).map(({ p, key, proj, rank, of }) => {
+    const st = PM.STATS[key], g = p.game, avg5 = recent(p.id, key);
     let headline, sub;
     if (isTd(key)) {
       const tds = model.log(p.id, 5).reduce((a, x) => a + st.f(x.s), 0);
@@ -403,6 +414,7 @@ function renderPlays() {
     }
     return `<article class="play">
       <div class="play-head"><strong>${T.esc(p.name)}</strong> <span class="muted small">${p.pos} · ${p.team} ${p.team === g.home ? "vs" : "@"} ${p.opp} · ${kickoff(g)}</span></div>
+      ${all ? `<p class="play-tag">${st.label} <span class="muted small">· #${rank} of ${of}</span></p>` : ""}
       <p class="play-line">${headline}</p>
       <p class="muted small play-sub">${sub}</p>
       <div class="miles">${milestoneRows(p, key, proj)}</div>
@@ -573,7 +585,7 @@ async function init() {
   }
   $("#p-stat").innerHTML = Object.entries(PM.STATS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
   $("#p-stat").value = "rec_yds";
-  $("#t-stat").innerHTML = $("#p-stat").innerHTML;
+  $("#t-stat").innerHTML = '<option value="all">All Props</option>' + $("#p-stat").innerHTML;
   $("#t-stat").value = "anytime_td";
   renderPlays();
   fillOutlookList();
