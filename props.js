@@ -624,6 +624,16 @@ async function refreshUser() {
   renderAll();
 }
 
+// Read-only view of what this page has loaded, for the "Ask the model" chat (chat.js).
+window.GridIronProps = {
+  ready: () => !!model && players.length > 0,
+  players: () => players,
+  saved: () => saved,
+  upcomingGames: () => upcomingGames,
+  settings,
+  kickoff,
+};
+
 window.GridIron = {
   start() {
     if (!started) { started = true; init(); }
