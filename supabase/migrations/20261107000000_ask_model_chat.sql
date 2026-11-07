@@ -134,7 +134,7 @@ used as (
     count(*) as requests,
     count(*) filter (where l.status = 'rate_limited') as rate_limited,
     count(*) filter (where l.status = 'error') as errors,
-    count(distinct l.turn_id) as questions,
+    count(distinct l.turn_id) filter (where l.status = 'ok') as questions,
     coalesce(sum(l.input_tokens), 0) as input_tokens,
     coalesce(sum(l.output_tokens), 0) as output_tokens,
     coalesce(sum(l.cached_tokens), 0) as cached_tokens
@@ -157,10 +157,10 @@ create view public.chat_usage_daily
 with (security_invoker = true)
 as
 select (l.created_at at time zone 'America/Los_Angeles')::date as day, l.provider, l.model,
-  count(distinct l.turn_id) as questions, count(*) as requests,
+  count(distinct l.turn_id) filter (where l.status = 'ok') as questions, count(*) as requests,
   count(*) filter (where l.status = 'rate_limited') as rate_limited,
   sum(l.input_tokens) as input_tokens, sum(l.output_tokens) as output_tokens, sum(l.cached_tokens) as cached_tokens,
-  round((sum(l.input_tokens) + sum(l.output_tokens))::numeric / nullif(count(distinct l.turn_id), 0)) as tokens_per_question
+  round((sum(l.input_tokens) + sum(l.output_tokens))::numeric / nullif(count(distinct l.turn_id) filter (where l.status = 'ok'), 0)) as tokens_per_question
 from public.chat_log l
 group by 1, 2, 3;
 revoke all on public.chat_usage_daily from anon, authenticated;

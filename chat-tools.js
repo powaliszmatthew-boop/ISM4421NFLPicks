@@ -253,9 +253,12 @@
       const why = weak.length ? `${weak.length} leg${weak.length > 1 ? "s don't clear your " + pct(minEdge, 0) + " minimum on their own" : " doesn't clear your " + pct(minEdge, 0) + " minimum on its own"}`
         : sameGame ? "two or more legs are from the same game, so their results are linked and the model's combined chance is unreliable"
         : evP < bestSingle ? "the best single leg has a bigger edge than the parlay" : "";
-      const v = evP >= minEdge && !sameGame
+      // Suggested only when the parlay clears the minimum and isn't worse than betting the legs as singles.
+      const goodSingles = legs.filter(x => x.chosen.ev >= minEdge).map(x => `${x.p.name} ${sideLabel(x.st, x.chosen.side, x.line)}`);
+      const v = evP >= minEdge && !singlesBetter
         ? { action: "Suggested", text: `Suggested: the ${legs.length}-leg parlay at ${PM.fmtOdds(parlayOdds)}` }
-        : { action: "Pass", text: evP > 0 && !sameGame ? `Pass on the parlay (its ${signedPct(evP)} edge is below your ${pct(minEdge, 0)} minimum)` : "Pass on the parlay" };
+        : { action: "Pass", text: `Pass on the parlay${evP >= minEdge && !sameGame ? "" : evP > 0 && !sameGame ? ` (its ${signedPct(evP)} edge is below your ${pct(minEdge, 0)} minimum)` : ""}` +
+            (goodSingles.length ? `; bet ${goodSingles.join(" and ")} as a single${goodSingles.length > 1 ? "s" : ""} instead` : "") };
       const stake = v.action === "Suggested" ? env.settings().bankroll * Math.min(MAX_STAKE, kelly / 4) : 0;
       const token = `[[S${++stakeN}]]`;
       const legOut = legs.map(x => {
@@ -274,6 +277,8 @@
         same_game: sameGame, singles_better: singlesBetter, singles_reason: why || undefined, verdict: v.text,
         suggested_stake: stake > 0 ? `${token} (${pct(Math.min(MAX_STAKE, kelly / 4))} of bankroll)` : `${token} (none, pass)`,
         stake_token: token, min_edge: pct(minEdge, 0),
+        check_news: legOut.some(l => l.check_news) ? legOut.filter(l => l.check_news).map(l => l.player) : false,
+        little_history: legOut.some(l => l.little_history) ? legOut.filter(l => l.little_history).map(l => l.player) : false,
         note: "Combined chance multiplies the legs, so it assumes they're independent.",
       };
     }
