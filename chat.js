@@ -39,6 +39,12 @@
       </footer>
     </section>`);
 
+  // A second way in, from the page's menu bar, in case something else covers the corner button
+  // (Netlify can show its own badge in the bottom-right corner).
+  const navBar = q(".lnav .nav");
+  if (navBar) navBar.insertAdjacentHTML("afterbegin", '<a href="#chat" id="chat-nav" class="pill-link" hidden>Ask the model</a>');
+  const navBtn = q("#chat-nav");
+
   const toggle = q("#chat-toggle"), panel = q("#chat-panel"), log = q("#chat-log");
   const form = q("#chat-form"), input = q("#chat-input"), send = q("#chat-send");
   const client = () => window.GridIronAuth && window.GridIronAuth.client;
@@ -213,10 +219,11 @@
     toggle.setAttribute("aria-expanded", String(open));
     document.body.classList.toggle("chat-open", open);
     if (open) { showEmpty(); input.focus(); status(); }
-    else toggle.focus();
+    else if (!toggle.hidden) toggle.focus();
   }
 
   toggle.addEventListener("click", () => setOpen(true));
+  if (navBtn) navBtn.addEventListener("click", e => { e.preventDefault(); setOpen(true); });
   q("#chat-close").addEventListener("click", () => setOpen(false));
   panel.addEventListener("keydown", e => { if (e.key === "Escape") setOpen(false); });
   form.addEventListener("submit", e => {
@@ -235,6 +242,7 @@
   // Signed-in users only. Signing out closes the panel and forgets the conversation.
   document.addEventListener("gridiron:auth", async e => {
     const user = e.detail && e.detail.user;
+    if (navBtn) navBtn.hidden = !user;
     if (!user) { history = []; lastContext = ""; log.innerHTML = ""; setOpen(false); toggle.hidden = true; return; }
     toggle.hidden = open;
     try {
